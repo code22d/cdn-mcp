@@ -249,9 +249,9 @@ cdn-mcp/
 │   ├── index.ts                   ← Worker entry: routing, CORS preflight, /health, /mcp/<token>
 │   ├── cors.ts                    ← CORS headers + helpers
 │   ├── types.ts                   ← Env, Tool, ToolResult, JSON-RPC envelopes
-│   ├── sigv4.ts                   ← AWS SigV4 presigning for R2 (Phase 4)
 │   ├── mcp/
 │   │   ├── dispatch.ts            ← JSON-RPC 2.0 dispatcher (initialize, tools/list, tools/call)
+│   │   ├── sigv4.ts               ← AWS SigV4 presigning for R2 (Phase 4)
 │   │   ├── upload.ts              ← performUpload + commitFileMetadata (shared write-side)
 │   │   ├── util.ts                ← validators, MIME inference, cursor codec, DEFAULT_CACHE_CONTROL
 │   │   └── tools/
