@@ -1,0 +1,34 @@
+# Dependencies — never commit; macOS/Linux native binaries diverge
+node_modules/
+
+# Wrangler local cache + dev secrets
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Local secrets (per Phase 0 hygiene rule — never commit a token file)
+mcp_auth_token*.txt
+mcp_auth_token*
+
+# Build/output (we don't generate these in this project, but defensive)
+dist/
+build/
+out/
+
+# Editor / OS clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary test fixtures (Phase 4 large-file test artifacts)
+/tmp/phase*-fixture*
+*.bin.tmp

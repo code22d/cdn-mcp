@@ -1,0 +1,87 @@
+# =====================================================================
+# cdn-mcp — Cloudflare Worker
+# =====================================================================
+# Personal CDN MCP server. R2 stores bytes; D1 is the metadata source of
+# truth. Public reads come straight from R2 via cdn.22d.app (no Worker
+# hop). Writes / metadata queries go through this Worker via the MCP
+# JSON-RPC protocol.
+#
+# Deploy:        npx wrangler deploy
+# Tail logs:     npx wrangler tail
+# Local dev:     npx wrangler dev
+#
+# First-deploy prerequisites (run once, locally):
+#   1. Create the R2 bucket:
+#        npx wrangler r2 bucket create cdn-assets
+#   2. Create the D1 database, paste the returned database_id below:
+#        npx wrangler d1 create cdn-db
+#   3. Apply the initial migration:
+#        npx wrangler d1 migrations apply cdn-db --remote
+#   4. Set the MCP shared secret (and verify it landed):
+#        cat ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt | tail -1 \
+#          | npx wrangler secret put MCP_AUTH_TOKEN
+#        npx wrangler secret list   # MCP_AUTH_TOKEN must appear
+#   5. Deploy:
+#        npx wrangler deploy
+#   6. Then DELETE the local token file:
+#        rm ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt
+#
+# In Phase 0 we deploy to the workers.dev URL only. Custom routes
+# (cdn-mcp.22d.app, cdn.22d.app) are activated in P0-Finalize after DNS
+# propagation completes.
+# =====================================================================
+
+name = "cdn-mcp"
+main = "src/index.ts"
+account_id = "1ca89091477fe859962f0e9a14e8942e"
+
+# Pinned 2026-01-01: recent enough for current Workers runtime semantics,
+# stable enough not to chase the cutting edge. Bump deliberately.
+compatibility_date = "2026-01-01"
+
+# -----------------------------------------------------------------------
+# Custom route — uncomment in P0-Finalize after 22d.app DNS is active on
+# Cloudflare. Until then, the worker is reachable at the workers.dev URL.
+# -----------------------------------------------------------------------
+route = { pattern = "cdn-mcp.22d.app/*", zone_id = "06ffb5bbfbc39d9b0628bec19142b881" }
+
+[vars]
+# Public URL prefix for assets served from R2. Read from env so swapping
+# domains is a config-only change (Build Plan DON'T list).
+PUBLIC_URL_PREFIX = "https://cdn.22d.app"
+
+# Cloudflare account ID — used by Phase 4 cdn_signed_upload_url to build
+# the R2 S3 endpoint hostname (`<account>.r2.cloudflarestorage.com`). NOT
+# a secret: it's already exposed in every presigned URL we emit. Stored
+# as a [vars] entry so it's obvious in code review and in `wrangler
+# whoami` parity.
+CLOUDFLARE_ACCOUNT_ID = "1ca89091477fe859962f0e9a14e8942e"
+
+# Phase 4 also requires two SECRETS (set separately via `wrangler secret put`,
+# NOT in [vars]):
+#   R2_ACCESS_KEY_ID       — Access Key ID from R2 dashboard "Manage R2 API
+#                             Tokens", Object Read & Write on cdn-assets.
+#   R2_SECRET_ACCESS_KEY   — Secret Access Key shown once at token creation.
+# Verify both landed:    npx wrangler secret list
+# Expected after Phase 4 deploy: MCP_AUTH_TOKEN, R2_ACCESS_KEY_ID,
+#                                R2_SECRET_ACCESS_KEY.
+
+# -----------------------------------------------------------------------
+# R2 bucket binding — bytes live here.
+# -----------------------------------------------------------------------
+[[r2_buckets]]
+binding = "ASSETS"
+bucket_name = "cdn-assets"
+
+# -----------------------------------------------------------------------
+# D1 database binding — file metadata source of truth.
+# Paste the database_id from `npx wrangler d1 create cdn-db` below.
+# -----------------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "cdn-db"
+database_id = "f506c507-7b37-4dd4-80ef-8c2db28aacf9"
+migrations_dir = "src/db/migrations"
+
+[observability]
+enabled = true

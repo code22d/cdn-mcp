@@ -1,0 +1,11 @@
+{
+  // Tests run under Node via tsx — they need @types/node, NOT
+  // @cloudflare/workers-types alone. Splitting the configs keeps the Worker
+  // source from accidentally pulling in Node-only APIs.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules"]
+}
