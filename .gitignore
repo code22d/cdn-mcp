@@ -32,3 +32,4 @@ yarn-error.log*
 # Temporary test fixtures (Phase 4 large-file test artifacts)
 /tmp/phase*-fixture*
 *.bin.tmp
+skills/*-workspace/
