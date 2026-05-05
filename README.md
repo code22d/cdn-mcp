@@ -216,13 +216,19 @@ npx tsc --noEmit                 # 1. typecheck clean
 npm test                         # 2. tests pass
 npx wrangler whoami              # 3. right account
 npx wrangler secret list         # 4. secrets present (silent miss = silent 404 in prod)
-npm run deploy                   # 5. ship
-curl -s https://<host>/health    # 6. smoke
+npm run deploy                   # 5. ship to Cloudflare
+curl -s https://<host>/health    # 6. smoke (expect new version in response)
 # 7. MCP initialize curl
-# 8. Only then: refresh the connector in Claude if needed
+git status                       # 8. confirm working copy isn't drifting from what just shipped
+git add -A                       # 9. stage all phase changes
+git commit -m "feat: ..."        # 10. commit with phase / change summary
+git push                         # 11. ship to GitHub (source = deployed code)
+# 12. Only then: refresh the connector in Claude if needed
 ```
 
 Each step has bitten us at least once. Skip none.
+
+**Why steps 8–11 are non-optional:** Phase 5.0a deployed cleanly to Cloudflare 2026-05-04 but the code never made it to GitHub for two days. We caught it during the cdn-file-upload skill push when `git status` revealed 10 modified files + 3 untracked files from the previous deploy. Source-on-GitHub and code-on-Cloudflare must move together; otherwise next-builder picks up an out-of-date repo and either re-implements changes or merges over deployed work. The 30 seconds it costs to commit + push is worth the alternative.
 
 ## Useful one-liners
 
