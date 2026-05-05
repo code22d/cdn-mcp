@@ -1,6 +1,6 @@
 {
   "name": "cdn-mcp",
-  "version": "0.1.0-phase4.1",
+  "version": "0.1.0-phase5a",
   "description": "Personal CDN MCP server on Cloudflare Workers + R2 + D1. Phase 0 = scaffold with parity stubs for the full tool surface.",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts"
+    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts && tsx test/phase5a.ts"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20"

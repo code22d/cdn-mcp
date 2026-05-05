@@ -50,7 +50,7 @@ interface FilesCursor {
 export const cdn_list_files: Tool = {
   name: NAME,
   description:
-    "List files on the personal CDN. If `project` is provided, returns only files within that project; otherwise returns files across all projects. Each entry includes name, public URL, size, content-type, and timestamps. Supports cursor pagination.",
+    "List files in a project (or globally if `project` omitted). Sorted by `uploaded_at` DESC then `id` ASC (newest first; UUID tiebreak for stability). Cursor-paginated — pass `next_cursor` from a prior response to get the next page. Each entry: name, project, public URL, size_bytes, content_type, uploaded_at, last_replaced_at, version.",
   inputSchema: {
     type: "object",
     properties: {

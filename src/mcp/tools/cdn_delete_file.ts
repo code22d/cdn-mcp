@@ -49,7 +49,7 @@ interface ExistingFileRow {
 export const cdn_delete_file: Tool = {
   name: NAME,
   description:
-    "Permanently delete a file from the personal CDN. Removes both the R2 object and the metadata row. The public URL will return 404 after this call. Cannot be undone.",
+    "Delete a file from both R2 and D1. R2 delete first (idempotent — safe to retry on partial failures), then D1 row delete. Errors with `file_not_found` if the D1 row doesn't exist. Does NOT auto-delete empty project rows — projects accumulate harmlessly with `file_count: 0` until manually managed.",
   inputSchema: {
     type: "object",
     properties: {

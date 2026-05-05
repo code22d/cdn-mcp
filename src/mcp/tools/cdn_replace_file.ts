@@ -35,7 +35,7 @@ const NAME = "cdn_replace_file";
 export const cdn_replace_file: Tool = {
   name: NAME,
   description:
-    "Overwrite an existing file in place at (project, name). The R2 key, public URL, and file id are preserved — only the bytes change. Bumps `version` and sets `last_replaced_at` in the metadata DB. Use this whenever you want a stable URL across content updates (e.g. a hero image that gets refreshed). Errors if the file does not already exist.",
+    "Overwrite an existing file in place. Same R2 key, same public URL — embedded links don't break. Bumps `version`, sets `last_replaced_at`. Errors with `file_not_found` if the file doesn't exist (use `cdn_upload_file` to create). Cache window is ~60s; for instant verification fetch with `?v=<n>` or `?bust=<timestamp>`. Same size guidance as `cdn_upload_file`.",
   inputSchema: {
     type: "object",
     properties: {

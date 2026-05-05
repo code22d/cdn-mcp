@@ -9,6 +9,11 @@
 // here as a stub, THEN implemented. Never silently add or rename a tool —
 // it breaks the connector-side contract that lets phases ship without
 // connector migrations.
+//
+// Phase 5.0a (2026-05-04) deliberately extended the surface from 12 to 13
+// tools by adding `cdn_help` — a meta tool that returns the Usage Guide.
+// This was a planned, head-session-approved addition (Build Plan Meta Tools
+// table), not surface drift.
 // -----------------------------------------------------------------------------
 
 import type { Tool } from "../../types";
@@ -29,6 +34,9 @@ import { cdn_finalize_upload } from "./cdn_finalize_upload";
 import { cdn_rename_file } from "./cdn_rename_file";
 import { cdn_set_cache_headers } from "./cdn_set_cache_headers";
 
+// Meta tools (Phase 5.0a+)
+import { cdn_help } from "./cdn_help";
+
 export const TOOLS: Tool[] = [
   // v1
   cdn_upload_file,
@@ -44,6 +52,8 @@ export const TOOLS: Tool[] = [
   cdn_finalize_upload,
   cdn_rename_file,
   cdn_set_cache_headers,
+  // Meta
+  cdn_help,
 ];
 
 // Module-load guard: fail loud if two tools accidentally share a name.

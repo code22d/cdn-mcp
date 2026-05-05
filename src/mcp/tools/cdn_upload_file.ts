@@ -29,7 +29,7 @@ const NAME = "cdn_upload_file";
 export const cdn_upload_file: Tool = {
   name: NAME,
   description:
-    "Upload a file (provided as base64-encoded bytes) into a project on the personal CDN. The file becomes publicly available at https://cdn.22d.app/{project}/{name}. If the project does not exist it is auto-created. Errors if a file with the same name already exists in the project unless `replace` is true (in which case prefer `cdn_replace_file` for clarity).",
+    "Upload bytes into a project, base64-encoded in the request. Auto-creates the project if missing. Errors with `file_exists` unless `replace: true`. Best for files <5MB — base64 inflates calling-session context. For 5–50MB from inside a sandboxed session, fan out via subagents (each subagent holds the base64 in its own context). For >50MB, use `cdn_signed_upload_url` instead. See `cdn_help` for full upload-pattern guidance.",
   inputSchema: {
     type: "object",
     properties: {

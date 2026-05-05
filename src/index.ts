@@ -22,7 +22,7 @@ import type { Env } from "./types";
 // start, and so test/sanity.ts can import the same TOOLS array.
 export { TOOLS } from "./mcp/tools/index";
 
-const VERSION = "0.1.0-phase4.1";
+const VERSION = "0.1.0-phase5a";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

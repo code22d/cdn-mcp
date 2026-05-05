@@ -4,11 +4,12 @@
 // Run via: npm test  (which runs `tsx test/sanity.ts`)
 //
 // Asserts:
-//   1. All 12 expected tool names are present in the registry.
+//   1. All 13 expected tool names are present in the registry.
+//      (Phase 0 = 12; Phase 5.0a added cdn_help for 13 total.)
 //   2. Each tool has name + description + inputSchema + handler.
 //   3. No duplicate tool names.
 //   4. The dispatcher returns a well-formed JSON-RPC `tools/list` response
-//      listing all 12 tools with name + description + inputSchema.
+//      listing all 13 tools with name + description + inputSchema.
 //   5. The dispatcher returns a `tools/call` stub response with
 //      result.content[0].text containing "not_yet_implemented" AND
 //      result.isError === true. Asserts against a tool that is STILL a stub
@@ -39,6 +40,8 @@ const EXPECTED_TOOL_NAMES = [
   "cdn_finalize_upload",
   "cdn_rename_file",
   "cdn_set_cache_headers",
+  // Meta — Phase 5.0a (1)
+  "cdn_help",
 ];
 
 let pass = 0;
@@ -80,13 +83,14 @@ async function main() {
   console.log("====================");
 
   // -----------------------------------------------------------------
-  // Assertion 1: all 12 expected tool names present
+  // Assertion 1: all 13 expected tool names present
+  // (Phase 5.0a bumped this from 12 to 13 by adding cdn_help.)
   // -----------------------------------------------------------------
-  await check("all 12 expected tool names registered", () => {
+  await check("all 13 expected tool names registered", () => {
     const names = TOOLS.map((t) => t.name).sort();
     const expected = [...EXPECTED_TOOL_NAMES].sort();
     assert.deepEqual(names, expected, "tool name set mismatch");
-    assert.equal(TOOLS.length, 12, "expected exactly 12 tools");
+    assert.equal(TOOLS.length, 13, "expected exactly 13 tools");
   });
 
   // -----------------------------------------------------------------
@@ -132,7 +136,7 @@ async function main() {
   // Assertion 4: dispatcher tools/list returns a well-formed envelope
   // -----------------------------------------------------------------
   await check(
-    "dispatcher tools/list returns well-formed JSON-RPC envelope with all 12 tools",
+    "dispatcher tools/list returns well-formed JSON-RPC envelope with all 13 tools",
     async () => {
       const req = new Request("https://cdn-mcp.example/mcp/test-token", {
         method: "POST",
@@ -159,7 +163,7 @@ async function main() {
       assert.equal(body.jsonrpc, "2.0");
       assert.equal(body.id, 1);
       assert.ok(Array.isArray(body.result?.tools), "result.tools is not an array");
-      assert.equal(body.result.tools.length, 12, "expected 12 tools in tools/list");
+      assert.equal(body.result.tools.length, 13, "expected 13 tools in tools/list");
       for (const tool of body.result.tools) {
         assert.equal(typeof tool.name, "string");
         assert.equal(typeof tool.description, "string");

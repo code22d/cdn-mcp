@@ -57,7 +57,7 @@ interface ExistingFileRow {
 export const cdn_finalize_upload: Tool = {
   name: NAME,
   description:
-    "Finalize a presigned R2 upload by inserting the corresponding metadata row into D1. Called by the client after a successful direct-to-R2 PUT via the URL produced by cdn_signed_upload_url.",
+    "Step 3 of the signed-URL upload flow (after `cdn_signed_upload_url` + the actual PUT). Verifies the R2 object exists at the expected key and that `size_bytes` matches the actual stored size — rejects with `r2_object_not_found` or `size_mismatch` to catch incomplete uploads. Returns the same response shape as `cdn_upload_file`.",
   inputSchema: {
     type: "object",
     properties: {

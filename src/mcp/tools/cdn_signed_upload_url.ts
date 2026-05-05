@@ -45,7 +45,7 @@ interface ExistingFileRow {
 export const cdn_signed_upload_url: Tool = {
   name: NAME,
   description:
-    "Generate a short-lived presigned R2 URL for direct browser-to-R2 PUT uploads. Use this for files larger than the Worker request-body limit (~100MB). After a successful PUT to the returned URL, call cdn_finalize_upload to record the file's metadata.",
+    "Generate a short-lived presigned R2 URL for direct PUT uploads. Use for files >100MB or to avoid base64 round-trip overhead. PUTs to the returned URL fail from inside the Cowork sandbox (egress to `*.r2.cloudflarestorage.com` is blocked — symptom: status 000). Run the PUT from a local terminal, real browser, or any non-sandbox network. ALL headers from `required_headers` must be sent in the PUT exactly as returned. After PUT, call `cdn_finalize_upload`. See `cdn_help` for the full two-step flow.",
   inputSchema: {
     type: "object",
     properties: {
