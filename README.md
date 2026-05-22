@@ -6,7 +6,7 @@ Built phase-by-phase using a head-session/builder-session orchestration pattern.
 
 ## Status
 
-**Currently shipping Worker `0.1.0-phase5a`, plugin `v0.3.1`, cdn-cli `v0.1.0`. 11 of 13 tools have real handlers; 2 remain cosmetic stubs (`cdn_rename_file`, `cdn_set_cache_headers`).**
+**Currently shipping Worker `0.1.0-phase5a`, plugin `v0.3.1`, cdn-cli `v0.1.0`, cdn-setup skill `v0.1.0`. 11 of 13 tools have real handlers; 2 remain cosmetic stubs (`cdn_rename_file`, `cdn_set_cache_headers`).**
 
 | Phase | Status | What shipped |
 |---|---|---|
@@ -25,6 +25,7 @@ Built phase-by-phase using a head-session/builder-session orchestration pattern.
 | 8.1 | ✅ | Clickable upload scripts (cross-platform `.command` / `.sh` / `.bat`); plugin v0.3.0 |
 | 8.2 | ✅ | `chmod +x` clickable scripts before `present_files`; plugin v0.3.1 |
 | 9 | ✅ | Partner-onboarding docs (`PARTNER-SETUP.md` + `INSTALL-WITH-CLAUDE.md`), README refresh |
+| 10 | ✅ | cdn-setup Cowork skill v0.1.0 — single guided setup path replacing both Phase 9 docs |
 
 ## Tool surface
 
@@ -58,14 +59,27 @@ If a Notion doc and this README disagree, Notion wins. Update the README.
 
 ---
 
-# Setting up your own personal CDN
+# Set up your own personal CDN
 
-Stand up your own instance under your Cloudflare account, your domain, your R2 bucket. Two paths:
+One path: install the **cdn-setup Cowork skill**, then ask Claude to walk you through it.
 
-1. **Guided install via Claude Code** (recommended, ~80% automated) — paste **[INSTALL-WITH-CLAUDE.md](./INSTALL-WITH-CLAUDE.md)** into a fresh Claude Code session. Claude handles installs, deployment, and configuration; you click through a few Cloudflare dashboard screens.
-2. **Manual walkthrough** — **[PARTNER-SETUP.md](./PARTNER-SETUP.md)** has every command and click written out. Pick this if you don't use Claude Code, or you want to understand what's happening at each step.
+```bash
+gh release download cdn-setup-v0.1.0 --repo code22d/cdn-mcp --pattern "*.skill" --dir ~/Downloads
+```
 
-Both take ~30–60 minutes including DNS propagation. After setup you have your own CDN at `cdn.your-domain.com` (or `pub-xxx.r2.dev`), MCP-controllable from Cowork.
+In a Cowork session, ask Claude:
+
+> *"Install this skill: `~/Downloads/cdn-setup.skill`"*
+
+Claude will surface the file as a card — click **Save** to install. Then open a fresh Cowork session and say:
+
+> *"set me up with my own personal CDN"*
+
+The skill orchestrates the full 6-phase setup (~30–60 min): Cloudflare account + R2, prereq installs, Worker deploy, CLI install, Cowork connector setup, end-to-end smoke test. It generates clickable `.command` scripts you double-click on your host for the parts that need real-machine access, and drives the Cloudflare and claude.ai dashboards via the Chrome MCP when available (falls back to manual click-and-paste otherwise).
+
+Requires a Cloudflare account (free tier is enough; credit card needed for R2 subscription even at $0 usage), a few minutes of focused attention, and optionally a domain on Cloudflare DNS for branded URLs.
+
+See the [cdn-setup release notes](https://github.com/code22d/cdn-mcp/releases/tag/cdn-setup-v0.1.0) for the latest setup details.
 
 ---
 

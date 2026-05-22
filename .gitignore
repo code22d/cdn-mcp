@@ -47,3 +47,7 @@ skills/*-workspace/
 # plugin/skills/ is populated by build.sh from the canonical skills/ source.
 cdn-mcp-plugin.plugin
 plugin/skills/
+
+# Phase 10 — cdn-setup skill build artifact
+# Built from skills/cdn-setup/ at release time.
+cdn-setup.skill
