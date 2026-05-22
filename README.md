@@ -213,6 +213,8 @@ subagent fan-out, signed-URL `.command` script, or local CLI) based on file
 size and batch size. The plugin is just the skill + a partner-onboarding
 README — it doesn't deploy infrastructure, doesn't bundle the CLI.
 
+Download the .plugin into a Cowork-accessible folder:
+
 ```bash
 gh release download plugin-v0.1.0 \
   --repo code22d/cdn-mcp \
@@ -220,9 +222,15 @@ gh release download plugin-v0.1.0 \
   --dir /tmp
 ```
 
-Then double-click `/tmp/cdn-mcp-plugin.plugin` to install in Cowork. After a
-fresh Cowork session, the `cdn-file-upload` skill will appear in the
-available-skills list, and saying "upload `<file>` to the CDN" will fire it.
+Then, in a Cowork session, ask Claude to install it (e.g. *"install the
+plugin at `/tmp/cdn-mcp-plugin.plugin`"*). Cowork surfaces the file card with
+a **Save** button — that's the installer. macOS has no file association for
+`.plugin`, so double-clicking in Finder does nothing; the `present_files`
+surface is the path that works today.
+
+After a fresh Cowork session, the `cdn-file-upload` skill will appear at the
+top of the available-skills list, and saying "upload `<file>` to the CDN"
+will fire it.
 
 See `plugin/README.md` in this repo for the plugin's setup walkthrough.
 

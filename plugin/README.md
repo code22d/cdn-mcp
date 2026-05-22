@@ -90,11 +90,35 @@ distinguish them from Worker versions like `v0.1.0-phase5a`.
 
 ## Install
 
-```bash
-gh release download plugin-v0.1.0 \
-  --repo code22d/cdn-mcp \
-  --pattern "*.plugin" \
-  --dir /tmp
-```
+macOS has no file association for `.plugin`, so double-clicking in Finder
+doesn't trigger an install. The working flow is to surface the file inside a
+Cowork session so its built-in file card shows the **Save** button — that
+button is the actual installer.
 
-Then double-click `/tmp/cdn-mcp-plugin.plugin` to install in Cowork.
+1. **Download the .plugin** to a Cowork-accessible folder:
+
+   ```bash
+   gh release download plugin-v0.1.0 \
+     --repo code22d/cdn-mcp \
+     --pattern "*.plugin" \
+     --dir /tmp
+   ```
+
+   `/tmp` works because Cowork can read it; any folder you've granted Cowork
+   access to via the folder picker also works.
+
+2. **In a Cowork session, ask Claude to install it** — e.g.
+   *"install the plugin at `/tmp/cdn-mcp-plugin.plugin`"*. Claude calls
+   `present_files` to surface the file in chat. The resulting file card has a
+   **Save** button.
+
+3. **Click Save.** Cowork installs the plugin into your account.
+
+4. **Open a fresh Cowork session.** The `cdn-file-upload` skill appears at the
+   top of the available-skills list with the description *"Upload files of any
+   size or type to Rene's personal CDN at cdn.22d.app via the cdn-mcp
+   connector."*
+
+The flow is one extra step compared to double-click but it's the path that
+works today. If you find a smoother install surface in your Cowork build,
+let us know.
