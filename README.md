@@ -63,8 +63,17 @@ If a Notion doc and this README disagree, Notion wins. Update the README.
 
 One path: install the **cdn-setup Cowork skill**, then ask Claude to walk you through it.
 
+**Option A — Click to download (no setup):**
+[cdn-setup-v0.1.0.skill](https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.1.0/cdn-setup.skill)
+
+**Option B — GitHub CLI:**
 ```bash
 gh release download cdn-setup-v0.1.0 --repo code22d/cdn-mcp --pattern "*.skill" --dir ~/Downloads
+```
+
+**Option C — curl (Mac/Linux):**
+```bash
+curl -L -o ~/Downloads/cdn-setup.skill https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.1.0/cdn-setup.skill
 ```
 
 In a Cowork session, ask Claude:
