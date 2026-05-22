@@ -9,7 +9,9 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts && tsx test/phase5a.ts"
+    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts && tsx test/phase5a.ts",
+    "build-plugin": "bash plugin/build.sh",
+    "release-plugin": "bash plugin/build.sh && gh release create plugin-v$(node -p \"require('./plugin/.claude-plugin/plugin.json').version\") cdn-mcp-plugin.plugin --repo code22d/cdn-mcp --title \"Cowork Plugin v$(node -p \"require('./plugin/.claude-plugin/plugin.json').version\")\" --notes-file plugin/README.md"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20"

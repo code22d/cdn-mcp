@@ -205,6 +205,27 @@ Only after curl returns the expected results, add the connector in Claude:
 
 You're live.
 
+## 11. (Optional) Install the Cowork plugin for upload know-how
+
+The companion Cowork plugin bundles the `cdn-file-upload` skill, which teaches
+Cowork sessions how to pick the right upload transport (direct base64,
+subagent fan-out, signed-URL `.command` script, or local CLI) based on file
+size and batch size. The plugin is just the skill + a partner-onboarding
+README — it doesn't deploy infrastructure, doesn't bundle the CLI.
+
+```bash
+gh release download plugin-v0.1.0 \
+  --repo code22d/cdn-mcp \
+  --pattern "*.plugin" \
+  --dir /tmp
+```
+
+Then double-click `/tmp/cdn-mcp-plugin.plugin` to install in Cowork. After a
+fresh Cowork session, the `cdn-file-upload` skill will appear in the
+available-skills list, and saying "upload `<file>` to the CDN" will fire it.
+
+See `plugin/README.md` in this repo for the plugin's setup walkthrough.
+
 ---
 
 # Daily-use deploy hygiene checklist

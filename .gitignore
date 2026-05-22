@@ -33,3 +33,9 @@ yarn-error.log*
 /tmp/phase*-fixture*
 *.bin.tmp
 skills/*-workspace/
+
+# Phase 7 — Cowork plugin build artifacts
+# The .plugin file is built from plugin/ + canonical skills/ at release time.
+# plugin/skills/ is populated by build.sh from the canonical skills/ source.
+cdn-mcp-plugin.plugin
+plugin/skills/

@@ -1,0 +1,11 @@
+{
+  "name": "cdn-mcp-plugin",
+  "version": "0.1.0",
+  "description": "Operational know-how for uploading files to a personal CDN on Cloudflare R2 + Workers + D1. Installs the cdn-file-upload skill, which picks the right transport for any file size or batch. Requires a deployed cdn-mcp Worker — see the plugin README for setup.",
+  "author": {
+    "name": "Rene Banuelos"
+  },
+  "homepage": "https://github.com/code22d/cdn-mcp",
+  "repository": "https://github.com/code22d/cdn-mcp",
+  "keywords": ["cdn", "cloudflare", "r2", "uploads", "mcp"]
+}
