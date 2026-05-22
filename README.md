@@ -6,7 +6,7 @@ Built phase-by-phase using a head-session/builder-session orchestration pattern.
 
 ## Status
 
-**Currently shipping `0.1.0-phase4.1`. 10 of 12 tools have real handlers; 2 remain stubs (cosmetic — `cdn_rename_file`, `cdn_set_cache_headers`).**
+**Currently shipping Worker `0.1.0-phase5a`, plugin `v0.3.1`, cdn-cli `v0.1.0`. 11 of 13 tools have real handlers; 2 remain cosmetic stubs (`cdn_rename_file`, `cdn_set_cache_headers`).**
 
 | Phase | Status | What shipped |
 |---|---|---|
@@ -16,7 +16,15 @@ Built phase-by-phase using a head-session/builder-session orchestration pattern.
 | 3 | ✅ | `cdn_get_file`, `cdn_get_stats` |
 | 4 | ✅ | `cdn_signed_upload_url`, `cdn_finalize_upload` (large-file uploads via SigV4) |
 | 4.1 | ✅ | Cache-Control bake-in for fresh-on-replace + aws4fetch unsignable-headers fix |
-| 5 | 🅿️ Parked | Admin UI / D1 explorer (optional) |
+| 5.0a | ✅ | `cdn_help` tool (13th in registry) + tool description hardening |
+| 5.5 | ✅ | `cdn-file-upload` skill for sandbox-aware uploads |
+| 6 | ✅ | `@22d/cdn-cli` v0.1.0 — local CLI for large/batch uploads |
+| 6.1 | ✅ | cdn-cli distribution via GitHub Release tarballs (fixes global install) |
+| 7 | ✅ | Cowork plugin packaging — `cdn-mcp-plugin` v0.1.0 |
+| 8 | ✅ | Skill simplification — Path E becomes dominant; plugin v0.2.0 |
+| 8.1 | ✅ | Clickable upload scripts (cross-platform `.command` / `.sh` / `.bat`); plugin v0.3.0 |
+| 8.2 | ✅ | `chmod +x` clickable scripts before `present_files`; plugin v0.3.1 |
+| 9 | ✅ | Partner-onboarding docs (`PARTNER-SETUP.md` + `INSTALL-WITH-CLAUDE.md`), README refresh |
 
 ## Tool surface
 
@@ -36,6 +44,7 @@ The tool surface is **frozen**. New tool ideas → propose → register as stub 
 | `cdn_finalize_upload` | Insert metadata after a presigned-URL PUT succeeds. | ✅ |
 | `cdn_rename_file` | Rename a file. Changes the public URL. | 🟡 stub |
 | `cdn_set_cache_headers` | Per-file Cache-Control overrides. | 🟡 stub |
+| `cdn_help` | Surface tool-surface guidance to MCP clients (which tool when, common pitfalls). | ✅ |
 
 ## Where to look for canonical docs
 
@@ -49,196 +58,14 @@ If a Notion doc and this README disagree, Notion wins. Update the README.
 
 ---
 
-# Forking this for your own CDN
+# Setting up your own personal CDN
 
-Stand up your own instance from this codebase. Assumes you have:
+Stand up your own instance under your Cloudflare account, your domain, your R2 bucket. Two paths:
 
-- A Cloudflare account (the free tier is enough)
-- A domain on Cloudflare DNS (or skip the custom-domain steps and use the default `*.workers.dev` URL)
-- Node 20+, npm, git
-- The Wrangler CLI: `npm install -g wrangler`
+1. **Guided install via Claude Code** (recommended, ~80% automated) — paste **[INSTALL-WITH-CLAUDE.md](./INSTALL-WITH-CLAUDE.md)** into a fresh Claude Code session. Claude handles installs, deployment, and configuration; you click through a few Cloudflare dashboard screens.
+2. **Manual walkthrough** — **[PARTNER-SETUP.md](./PARTNER-SETUP.md)** has every command and click written out. Pick this if you don't use Claude Code, or you want to understand what's happening at each step.
 
-## 1. Clone + install
-
-```bash
-git clone <this-repo-url> cdn-mcp
-cd cdn-mcp
-npm install
-```
-
-## 2. Authenticate Wrangler
-
-```bash
-npx wrangler login
-npx wrangler whoami     # confirm the right account
-```
-
-## 3. Update `wrangler.toml` for your account
-
-Open `wrangler.toml` and replace the following:
-
-- `account_id` — your Cloudflare account ID. Find it in the Cloudflare dashboard right sidebar after selecting any zone.
-- `[vars] PUBLIC_URL_PREFIX` — the public URL prefix for your assets. If you'll bind R2 to a custom domain (recommended; see step 6), use `https://cdn.<your-domain>`. Otherwise temporarily use a placeholder; you can update later.
-- `[[d1_databases]] database_id` — leave the placeholder for now; you'll fill it in after step 4.
-- `route` block — keep it commented out for now. Uncomment in step 7.
-
-## 4. Create R2 bucket + D1 database
-
-```bash
-# R2 bucket — bytes live here
-npx wrangler r2 bucket create cdn-assets
-
-# D1 database — metadata source of truth
-npx wrangler d1 create cdn-db
-# Copy the returned database_id and paste into wrangler.toml's database_id field
-
-# Apply the initial schema migration
-npx wrangler d1 migrations apply cdn-db --remote
-```
-
-## 5. Set the MCP shared secret
-
-The MCP auth token sits in the URL path because Claude's Custom Connectors don't support custom headers. Generate a strong random one:
-
-```bash
-TOKEN=$(openssl rand -hex 32)
-echo "$TOKEN" | npx wrangler secret put MCP_AUTH_TOKEN
-echo "Save this somewhere safe — you'll need it for the connector URL: $TOKEN"
-```
-
-You can rotate this any time later: re-run `wrangler secret put` with a new value, then update the connector URL in Claude.
-
-## 6. (Optional) Bind a custom domain to R2 for branded asset URLs
-
-In the Cloudflare dashboard → R2 → `cdn-assets` → Settings → Custom Domains → **Connect Domain**:
-1. Enter the subdomain you chose (e.g. `cdn.your-domain.com`).
-2. Cloudflare auto-creates the necessary CNAME on your zone.
-3. Wait ~2 minutes for the SSL cert to provision.
-
-Skip this step if you're OK with the default `pub-xxxxx.r2.dev` URL.
-
-## 7. (Optional) Bind a custom Worker route for the MCP API
-
-Decide on the hostname for the MCP API (e.g. `cdn-mcp.your-domain.com`).
-
-In `wrangler.toml`:
-- Uncomment the `route` block.
-- Set `pattern` to `<your-host>/*`.
-- Set `zone_id` to your zone's ID (Cloudflare dashboard → your domain → Overview → right sidebar).
-
-In the Cloudflare dashboard → your domain → DNS → Records → **Add record**:
-- Type: A
-- Name: `cdn-mcp` (or whatever subdomain you chose)
-- IPv4 address: `192.0.2.1` (TEST-NET-1 — never reached; Cloudflare's edge intercepts via the Worker route)
-- Proxy status: Proxied (orange cloud)
-
-Skip this step if you'll use the workers.dev URL.
-
-## 8. (Optional) Phase 4 prerequisites — large-file uploads via signed URLs
-
-If you'll use `cdn_signed_upload_url` to upload files larger than ~100MB:
-
-```bash
-# In Cloudflare dashboard → R2 → Manage R2 API Tokens → Create API Token
-# Permissions: Object Read & Write
-# Specify bucket: cdn-assets
-# Copy the Access Key ID and Secret Access Key (shown only once)
-
-echo "<your-access-key-id>"     | npx wrangler secret put R2_ACCESS_KEY_ID
-echo "<your-secret-access-key>" | npx wrangler secret put R2_SECRET_ACCESS_KEY
-npx wrangler secret list   # expect: MCP_AUTH_TOKEN, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-```
-
-For real browser uploads (vs. curl), enable CORS on the bucket. Cloudflare dashboard → R2 → `cdn-assets` → Settings → CORS Policy → Add:
-
-```json
-[
-  {
-    "AllowedOrigins": ["*"],
-    "AllowedMethods": ["PUT", "GET", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-(`AllowedOrigins: ["*"]` is fine for a personal CDN. Tighten if you want to lock to a specific frontend domain.)
-
-## 9. Deploy
-
-```bash
-npx tsc --noEmit                 # typecheck clean
-npm test                         # 70+ synthetic tests pass
-npx wrangler whoami              # right account
-npx wrangler secret list         # MCP_AUTH_TOKEN (and optionally R2 keys) present
-npm run deploy
-```
-
-## 10. Smoke-test
-
-Replace `<host>` with your route from step 7 (e.g. `cdn-mcp.your-domain.com`) or your `cdn-mcp.<subdomain>.workers.dev` URL if you skipped step 7. Replace `<token>` with the token from step 5.
-
-```bash
-# Health check
-curl -s https://<host>/health
-# Expect: {"status":"ok","service":"cdn-mcp","version":"0.1.0-phase4.1",...}
-
-# MCP initialize
-curl -s -X POST "https://<host>/mcp/<token>" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-# Expect: HTTP 200, serverInfo JSON, protocolVersion "2024-11-05"
-
-# tools/list — should list all 12 tools
-curl -s -X POST "https://<host>/mcp/<token>" \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | jq '.result.tools | length'
-# Expect: 12
-```
-
-Only after curl returns the expected results, add the connector in Claude:
-
-1. claude.ai → Settings → Customize → Connectors → **Add custom connector**.
-2. URL: `https://<host>/mcp/<token>`
-3. Verify all 12 tools appear in any Cowork session.
-
-You're live.
-
-## 11. (Optional) Install the Cowork plugin for upload know-how
-
-The companion Cowork plugin bundles the `cdn-file-upload` skill, which teaches
-Cowork sessions how to pick the right upload transport: direct base64 through
-the MCP for trivially small files (≤ 1 MB), the local `cdn` CLI for anything
-larger, and a signed-URL `.command` script as a fallback when the CLI isn't
-installed. The plugin is just the skill + a partner-onboarding README — it
-doesn't deploy infrastructure, doesn't bundle the CLI.
-
-The CLI (`cdn`) is required for non-trivial uploads. Install it from the
-[cdn-cli release](https://github.com/code22d/cdn-cli/releases/tag/v0.1.0)
-before relying on this plugin for anything larger than ~1 MB — without it the
-skill falls back to a double-click `.command` script for every upload.
-
-Download the .plugin into a Cowork-accessible folder:
-
-```bash
-gh release download plugin-v0.2.0 \
-  --repo code22d/cdn-mcp \
-  --pattern "*.plugin" \
-  --dir /tmp
-```
-
-Then, in a Cowork session, ask Claude to install it (e.g. *"install the
-plugin at `/tmp/cdn-mcp-plugin.plugin`"*). Cowork surfaces the file card with
-a **Save** button — that's the installer. macOS has no file association for
-`.plugin`, so double-clicking in Finder does nothing; the `present_files`
-surface is the path that works today.
-
-After a fresh Cowork session, the `cdn-file-upload` skill will appear at the
-top of the available-skills list, and saying "upload `<file>` to the CDN"
-will fire it.
-
-See `plugin/README.md` in this repo for the plugin's setup walkthrough.
+Both take ~30–60 minutes including DNS propagation. After setup you have your own CDN at `cdn.your-domain.com` (or `pub-xxx.r2.dev`), MCP-controllable from Cowork.
 
 ---
 

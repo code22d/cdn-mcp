@@ -10,6 +10,14 @@ node_modules/
 mcp_auth_token*.txt
 mcp_auth_token*
 
+# Defensive: env files, key material, packaged tarballs — never commit
+.env
+.env.*
+*.secret
+*.pem
+*.key
+*.tgz
+
 # Build/output (we don't generate these in this project, but defensive)
 dist/
 build/
