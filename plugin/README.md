@@ -2,12 +2,31 @@
 
 This plugin installs the `cdn-file-upload` skill, which gives Cowork sessions
 operational know-how for uploading files to a personal CDN built on Cloudflare
-R2 + Workers + D1. The skill picks the right transport (direct base64, subagent
-fan-out, local CLI, or signed-URL `.command` script) based on file size, batch
-size, and quality preferences.
+R2 + Workers + D1. For trivially small files (≤ 1 MB) the skill uploads
+directly through the MCP; for anything larger it prints a `cdn upload` command
+for you to run via the local CLI. A signed-URL `.command` script is offered as
+a fallback if the CLI isn't installed yet.
 
 This plugin doesn't bundle the CDN itself — the Worker and the CLI have their
 own install paths, referenced below.
+
+## What changed in v0.3.1
+
+- **Skill now `chmod +x`'s clickable scripts before surfacing them.** Fixes the
+  "could not be executed because you do not have appropriate access privileges"
+  error users hit when double-clicking `.command`/`.sh` files from earlier
+  v0.3.x builds.
+
+## What changed in v0.2.0
+
+- **Skill defaults to the CLI for any file > 1 MB.** Earlier versions had a
+  5-path decision tree with broken auto-detection; the CLI path was never
+  actually firing.
+- **Subagent fan-out and auto-compression removed from routing.** Compression
+  is still available on request; subagent gymnastics aren't needed now that
+  the CLI handles any size.
+- **The `.command` file flow is demoted to a fallback** for users who haven't
+  installed the CLI yet, rather than the default for large files.
 
 ## Required setup before this plugin is useful
 
@@ -32,10 +51,12 @@ URL: `https://cdn-mcp.<your-domain>/mcp/<your-MCP_AUTH_TOKEN>`
 Verify all 13 tools (`cdn_upload_file`, `cdn_list_files`, `cdn_signed_upload_url`,
 `cdn_finalize_upload`, `cdn_help`, etc.) appear in any Cowork session.
 
-### 3. (Optional but recommended) Install the local CLI
+### 3. Install the local CLI (required for non-trivial uploads)
 
-For uploads >50MB or batch uploads where Cowork would have to write a
-`.command` script for you to double-click, install the companion CLI:
+The skill defaults to the CLI for anything larger than ~1 MB. Without it, the
+skill falls back to a `.command` script you have to double-click for every
+upload — workable for day-1 partners, but the CLI is the smooth path. Install
+it once:
 
 ```bash
 gh release download v0.1.0 \
@@ -50,22 +71,23 @@ cdn version  # should print 0.1.0
 Then create `~/.cdn-cli/config.json` with your R2 access keys + MCP token. See
 the cdn-cli README for the config schema.
 
-The skill auto-detects the CLI when installed and prefers it over the
-sandbox-bound `.command` file flow. No skill edits needed — Path E activates
-automatically.
+The skill assumes the CLI is installed and prints a `cdn upload` command for
+the user to run. If `cdn: command not found` comes back, the skill falls back
+to the `.command` script flow and re-prints the install command above.
 
 ## What the skill does (after setup)
 
 When you ask Cowork to "upload `<files>` to the CDN", the skill picks the
-right transport based on file size and session context:
+right transport based on file size:
 
 | Path | When | How |
 |---|---|---|
-| **A** — direct base64 | Small files (<1 MB), or single file 1–3 MB | `cdn_upload_file` from the parent session |
-| **B** — subagent fan-out | Medium files (1–3 MB), batches >5 files | One subagent per file; parent only sees URLs |
-| **C** — signed URL + `.command` | Files >3 MB where quality matters | Generates `.command` script you double-click to run `curl` from your local terminal |
-| **D** — compress then base64 | Images >3 MB where web-optimized is fine | Pillow → 1920px JPEG q85 → Path A or B |
-| **E** — local CLI | Any size, CLI installed | `cdn upload <project> <file>` (preferred when available) |
+| **A** — direct base64 (MCP) | Single file ≤ 1 MB and batch ≤ 10 files | `cdn_upload_file` from the parent session — zero friction, no terminal needed |
+| **E** — local CLI (default) | Anything else | Skill prints `cdn upload <project> <abs-path>` (or `cdn upload-dir …`); you run it in your terminal; skill verifies via `cdn_get_stats` |
+| **C** — signed URL + `.command` (fallback) | CLI not installed | Generates a `.command` script you double-click to run `curl` from your local terminal — and prints the install command so the next upload skips this step |
+
+Compression is opt-in: if you ask the skill to compress images first, it will;
+otherwise Path E preserves the originals regardless of size.
 
 See `~/.claude/skills/cdn-file-upload/SKILL.md` (installed by this plugin) for
 the full decision tree, error handling, and sample interactions.
@@ -82,10 +104,10 @@ docs. The MCP connector is added separately (step 2 above).
 ## Versioning
 
 This plugin's version (in `plugin.json`) tracks independently from the
-cdn-mcp Worker (`0.1.0-phase5a`) and the cdn-cli (`v0.1.0`). Plugin `v0.1.0`
-is the first release.
+cdn-mcp Worker (`0.1.0-phase5a`) and the cdn-cli (`v0.1.0`). Current release:
+`plugin-v0.2.0` (simplified routing; CLI-first by default).
 
-Future plugin releases are tagged as `plugin-vX.Y.Z` on the cdn-mcp repo to
+Plugin releases are tagged as `plugin-vX.Y.Z` on the cdn-mcp repo to
 distinguish them from Worker versions like `v0.1.0-phase5a`.
 
 ## Install
@@ -98,7 +120,7 @@ button is the actual installer.
 1. **Download the .plugin** to a Cowork-accessible folder:
 
    ```bash
-   gh release download plugin-v0.1.0 \
+   gh release download plugin-v0.2.0 \
      --repo code22d/cdn-mcp \
      --pattern "*.plugin" \
      --dir /tmp

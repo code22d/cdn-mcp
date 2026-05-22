@@ -208,15 +208,21 @@ You're live.
 ## 11. (Optional) Install the Cowork plugin for upload know-how
 
 The companion Cowork plugin bundles the `cdn-file-upload` skill, which teaches
-Cowork sessions how to pick the right upload transport (direct base64,
-subagent fan-out, signed-URL `.command` script, or local CLI) based on file
-size and batch size. The plugin is just the skill + a partner-onboarding
-README — it doesn't deploy infrastructure, doesn't bundle the CLI.
+Cowork sessions how to pick the right upload transport: direct base64 through
+the MCP for trivially small files (≤ 1 MB), the local `cdn` CLI for anything
+larger, and a signed-URL `.command` script as a fallback when the CLI isn't
+installed. The plugin is just the skill + a partner-onboarding README — it
+doesn't deploy infrastructure, doesn't bundle the CLI.
+
+The CLI (`cdn`) is required for non-trivial uploads. Install it from the
+[cdn-cli release](https://github.com/code22d/cdn-cli/releases/tag/v0.1.0)
+before relying on this plugin for anything larger than ~1 MB — without it the
+skill falls back to a double-click `.command` script for every upload.
 
 Download the .plugin into a Cowork-accessible folder:
 
 ```bash
-gh release download plugin-v0.1.0 \
+gh release download plugin-v0.2.0 \
   --repo code22d/cdn-mcp \
   --pattern "*.plugin" \
   --dir /tmp
