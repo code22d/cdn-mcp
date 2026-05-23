@@ -32,6 +32,14 @@ export interface Env {
    * R2_ACCESS_KEY_ID. Shown ONCE in the dashboard at token creation time.
    */
   R2_SECRET_ACCESS_KEY: string;
+  /**
+   * Phase 11 OAuth signing key (HMAC-SHA256). Must be ≥ 32 bytes of entropy.
+   * Generate with:  openssl rand -hex 32  (or `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`)
+   * Set with:       wrangler secret put OAUTH_SIGNING_KEY
+   * The legacy /mcp/<token> path keeps working even if this is unset; only
+   * the new OAuth routes (/register, /authorize, /token, /mcp) fail closed.
+   */
+  OAUTH_SIGNING_KEY: string;
 }
 
 /** JSON-RPC 2.0 request/response envelopes per the MCP spec. */

@@ -76,6 +76,9 @@ const stubEnv = {
   CLOUDFLARE_ACCOUNT_ID: "test-account-id",
   R2_ACCESS_KEY_ID: "TESTACCESSKEYID0000",
   R2_SECRET_ACCESS_KEY: "TestSecretAccessKey0000000000000000000000",
+  // Phase 11: OAuth signing key. Not exercised by sanity tests — just present
+  // so the satisfies-Env shape compiles after the new field landed.
+  OAUTH_SIGNING_KEY: "test-oauth-signing-key-32-bytes-of-entropy-padded",
 } satisfies Env;
 
 async function main() {

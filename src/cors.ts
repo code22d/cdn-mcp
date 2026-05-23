@@ -4,13 +4,19 @@
 //
 // MCP clients (including Claude's Custom Connector) need permissive CORS to
 // complete the JSON-RPC handshake. We don't restrict origins here — auth is
-// handled by the path-embedded MCP_AUTH_TOKEN.
+// handled either by the path-embedded MCP_AUTH_TOKEN (legacy /mcp/<token>)
+// or by the OAuth Bearer header (Phase 11 /mcp + OAuth endpoints).
+//
+// The Authorization header MUST be in Allow-Headers so claude.ai's fetch can
+// send the Bearer token. WWW-Authenticate MUST be in Expose-Headers so the
+// client can read it on a 401 to discover the resource metadata URL.
 // -----------------------------------------------------------------------------
 
 export const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, MCP-Protocol-Version",
+  "Access-Control-Expose-Headers": "WWW-Authenticate, MCP-Protocol-Version",
   "Access-Control-Max-Age": "86400",
 };
 

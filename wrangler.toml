@@ -21,9 +21,17 @@
 #        cat ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt | tail -1 \
 #          | npx wrangler secret put MCP_AUTH_TOKEN
 #        npx wrangler secret list   # MCP_AUTH_TOKEN must appear
-#   5. Deploy:
+#   5. Phase 11: set the OAuth signing key (HMAC-SHA256, ≥ 32 bytes):
+#        openssl rand -hex 32 | npx wrangler secret put OAUTH_SIGNING_KEY
+#        npx wrangler secret list   # OAUTH_SIGNING_KEY must appear
+#      Legacy /mcp/<token> works even without this, but claude.ai's Custom
+#      Connector add flow (/register → /authorize → /token → /mcp) fails
+#      closed with 500 server_error until OAUTH_SIGNING_KEY is set.
+#   6. Apply the Phase 11 OAuth migration:
+#        npx wrangler d1 migrations apply cdn-db --remote
+#   7. Deploy:
 #        npx wrangler deploy
-#   6. Then DELETE the local token file:
+#   8. Then DELETE the local token file:
 #        rm ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt
 #
 # In Phase 0 we deploy to the workers.dev URL only. Custom routes

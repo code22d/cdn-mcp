@@ -509,6 +509,10 @@ export function makeEnv(store: MockStore): Env {
     CLOUDFLARE_ACCOUNT_ID: "test-account-id-1ca89091477fe859962f0e9a14e8942e",
     R2_ACCESS_KEY_ID: "TESTACCESSKEYID0000",
     R2_SECRET_ACCESS_KEY: "TestSecretAccessKey0000000000000000000000",
+    // Phase 11: present so the satisfies-Env shape compiles. Phase 1–5a tests
+    // never reach OAuth code paths, but Env's shape changed when this field
+    // was added.
+    OAUTH_SIGNING_KEY: "test-oauth-signing-key-32-bytes-of-entropy-padded",
   };
 }
 
