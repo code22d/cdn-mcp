@@ -41,7 +41,7 @@ import type { Env } from "./types";
 // start, and so test/sanity.ts can import the same TOOLS array.
 export { TOOLS } from "./mcp/tools/index";
 
-const VERSION = "0.1.0-phase11a";
+const VERSION = "0.1.0-phase11.1";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -69,7 +69,7 @@ export default {
       return protectedResourceMetadata(request);
     }
     if (path === "/.well-known/oauth-authorization-server" && method === "GET") {
-      return authorizationServerMetadata(request);
+      return authorizationServerMetadata(request, env);
     }
     if (path === "/register") {
       return handleRegister(request, env);

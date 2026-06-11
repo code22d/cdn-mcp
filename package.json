@@ -1,6 +1,6 @@
 {
   "name": "cdn-mcp",
-  "version": "0.1.0-phase11a",
+  "version": "0.1.0-phase11.1",
   "description": "Personal CDN MCP server on Cloudflare Workers + R2 + D1. Phase 11 adds OAuth 2.1 + DCR + Streamable HTTP for claude.ai Custom Connector.",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "tail": "wrangler tail",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts && tsx test/phase5a.ts && tsx test/phase11.ts",
+    "test": "tsx test/sanity.ts && tsx test/phase1.ts && tsx test/phase2.ts && tsx test/phase3.ts && tsx test/phase4.ts && tsx test/phase5a.ts && tsx test/phase11.ts && tsx test/phase11_1.ts",
     "build-plugin": "bash plugin/build.sh",
     "release-plugin": "bash plugin/build.sh && gh release create plugin-v$(node -p \"require('./plugin/.claude-plugin/plugin.json').version\") cdn-mcp-plugin.plugin --repo code22d/cdn-mcp --title \"Cowork Plugin v$(node -p \"require('./plugin/.claude-plugin/plugin.json').version\")\" --notes-file plugin/README.md",
     "build-skill": "bash skills/cdn-setup/build.sh",

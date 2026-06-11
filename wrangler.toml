@@ -29,9 +29,20 @@
 #      closed with 500 server_error until OAUTH_SIGNING_KEY is set.
 #   6. Apply the Phase 11 OAuth migration:
 #        npx wrangler d1 migrations apply cdn-db --remote
-#   7. Deploy:
+#   7. Phase 11.1 (confidential OAuth) — lock the connector behind a
+#      pre-shared Client ID + Secret. OPTIONAL but strongly recommended:
+#      without these, anyone who guesses the Worker URL can connect.
+#        openssl rand -hex 32 | npx wrangler secret put OAUTH_CLIENT_SECRET
+#        echo "cdn-mcp-claude" | npx wrangler secret put OAUTH_CLIENT_ID
+#          (or any client_id you want; matches what users paste in
+#           claude.ai's Add custom connector → Advanced settings)
+#      Setting BOTH disables Dynamic Client Registration and breaks any
+#      connector added without credentials — re-add it in claude.ai with
+#      the Client ID + Secret filled in. Setting only one of the two
+#      leaves enforcement OFF (a warning is logged).
+#   8. Deploy:
 #        npx wrangler deploy
-#   8. Then DELETE the local token file:
+#   9. Then DELETE the local token file:
 #        rm ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt
 #
 # In Phase 0 we deploy to the workers.dev URL only. Custom routes

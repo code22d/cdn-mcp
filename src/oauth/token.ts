@@ -14,6 +14,7 @@
 // -----------------------------------------------------------------------------
 
 import { jsonResponse, corsResponse } from "../cors";
+import { confidentialClientConfigured, timingSafeEqualStr } from "./confidential";
 import { issuerFromRequest } from "./metadata";
 import { issueTokenPair, verifyJwt, type RefreshTokenPayload } from "./jwt";
 import { requireSigningKey } from "./signing-key";
@@ -42,6 +43,14 @@ export async function handleToken(
 
   const params = await readTokenParams(request);
   if (params instanceof Response) return params;
+
+  // Phase 11.1 — confidential-client authentication. RFC 6749 §2.3.1: the
+  // client may send credentials via HTTP Basic or in the request body; the
+  // Basic header takes precedence when both are present.
+  if (confidentialClientConfigured(env)) {
+    const authResult = authenticateConfidentialClient(request, params, env);
+    if (authResult instanceof Response) return authResult;
+  }
 
   const grantType = params.get("grant_type");
   if (grantType === "authorization_code") {
@@ -161,6 +170,69 @@ async function handleRefresh(
 // -----------------------------------------------------------------------------
 // helpers
 // -----------------------------------------------------------------------------
+
+/**
+ * Phase 11.1 — validate confidential-client credentials. Returns null on
+ * success; a 401 Response on missing/invalid credentials. On success, the
+ * authenticated client_id is written into `params` if the body didn't carry
+ * one (the authorization_code grant requires it for its row check).
+ */
+function authenticateConfidentialClient(
+  request: Request,
+  params: URLSearchParams,
+  env: Env
+): Response | null {
+  let clientId: string | null = null;
+  let clientSecret: string | null = null;
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && /^Basic\s+/i.test(authHeader)) {
+    let decoded: string;
+    try {
+      decoded = atob(authHeader.replace(/^Basic\s+/i, "").trim());
+    } catch {
+      return invalidClient("malformed Basic authorization header");
+    }
+    const sep = decoded.indexOf(":");
+    if (sep < 0) {
+      return invalidClient("malformed Basic authorization header");
+    }
+    // RFC 6749 §2.3.1 — both halves are application/x-www-form-urlencoded.
+    try {
+      clientId = decodeURIComponent(decoded.slice(0, sep));
+      clientSecret = decodeURIComponent(decoded.slice(sep + 1));
+    } catch {
+      return invalidClient("malformed Basic authorization header");
+    }
+  } else {
+    clientId = params.get("client_id");
+    clientSecret = params.get("client_secret");
+  }
+
+  if (!clientId || !clientSecret) {
+    return invalidClient("client authentication required (Basic header or client_id + client_secret in body)");
+  }
+
+  const idOk = timingSafeEqualStr(clientId, env.OAUTH_CLIENT_ID!);
+  const secretOk = timingSafeEqualStr(clientSecret, env.OAUTH_CLIENT_SECRET!);
+  if (!idOk || !secretOk) {
+    return invalidClient("client authentication failed");
+  }
+
+  if (!params.get("client_id")) params.set("client_id", clientId);
+  return null;
+}
+
+/** RFC 6749 §5.2 — invalid_client SHOULD be 401 with WWW-Authenticate. */
+function invalidClient(description: string): Response {
+  return jsonResponse(
+    { error: "invalid_client", error_description: description },
+    {
+      status: 401,
+      headers: { "WWW-Authenticate": 'Basic realm="cdn-mcp-token"' },
+    }
+  );
+}
 
 async function readTokenParams(
   request: Request

@@ -11,6 +11,8 @@
 // -----------------------------------------------------------------------------
 
 import { jsonResponse } from "../cors";
+import { confidentialClientConfigured } from "./confidential";
+import type { Env } from "../types";
 
 /**
  * Derive the issuer URL from an incoming request. Honors Cloudflare's
@@ -36,8 +38,13 @@ export function protectedResourceMetadata(request: Request): Response {
   });
 }
 
-export function authorizationServerMetadata(request: Request): Response {
+export function authorizationServerMetadata(request: Request, env: Env): Response {
   const issuer = issuerFromRequest(request);
+  // Phase 11.1 — in confidential mode /token requires client credentials, so
+  // advertise the Basic/post methods instead of "none". registration_endpoint
+  // stays listed: /register answers 401 registration_not_supported, which
+  // claude.ai treats as "use the credentials from Advanced settings".
+  const confidential = confidentialClientConfigured(env);
   return jsonResponse({
     issuer,
     authorization_endpoint: `${issuer}/authorize`,
@@ -46,7 +53,9 @@ export function authorizationServerMetadata(request: Request): Response {
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code", "refresh_token"],
     code_challenge_methods_supported: ["S256"],
-    token_endpoint_auth_methods_supported: ["none"],
+    token_endpoint_auth_methods_supported: confidential
+      ? ["client_secret_basic", "client_secret_post"]
+      : ["none"],
     scopes_supported: ["cdn:full"],
     // RFC 8414 strongly recommends explicit revocation/introspection
     // endpoints; we don't support them in v1. Omitting the keys means

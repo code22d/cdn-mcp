@@ -40,6 +40,20 @@ export interface Env {
    * the new OAuth routes (/register, /authorize, /token, /mcp) fail closed.
    */
   OAUTH_SIGNING_KEY: string;
+  /**
+   * Phase 11.1 confidential OAuth client — pre-shared client_id. When BOTH
+   * OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET are set, DCR is disabled and
+   * /authorize + /token only accept this client. Users paste the pair into
+   * claude.ai's "Add custom connector" → Advanced settings.
+   * Set with:  echo "cdn-mcp-claude" | wrangler secret put OAUTH_CLIENT_ID
+   */
+  OAUTH_CLIENT_ID?: string;
+  /**
+   * Phase 11.1 confidential OAuth client — the shared secret. ≥ 32 bytes of
+   * entropy. Compared in constant time at /token.
+   * Generate + set with:  openssl rand -hex 32 | wrangler secret put OAUTH_CLIENT_SECRET
+   */
+  OAUTH_CLIENT_SECRET?: string;
 }
 
 /** JSON-RPC 2.0 request/response envelopes per the MCP spec. */

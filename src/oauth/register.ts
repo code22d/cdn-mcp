@@ -16,9 +16,10 @@
 // -----------------------------------------------------------------------------
 
 import { jsonResponse } from "../cors";
+import { confidentialClientConfigured } from "./confidential";
 import type { Env } from "../types";
 
-const ALLOWED_REDIRECT_URIS = new Set<string>([
+export const ALLOWED_REDIRECT_URIS = new Set<string>([
   "https://claude.ai/api/mcp/auth_callback",
 ]);
 
@@ -39,6 +40,17 @@ export async function handleRegister(
 ): Promise<Response> {
   if (request.method !== "POST") {
     return jsonError(405, "method_not_allowed", "POST required");
+  }
+
+  // Phase 11.1 — confidential-client mode disables DCR entirely. claude.ai
+  // sees this 401 and falls back to the client_id + client_secret the user
+  // pre-configured in Advanced settings.
+  if (confidentialClientConfigured(env)) {
+    return jsonError(
+      401,
+      "registration_not_supported",
+      "Dynamic registration is disabled. Ask the operator for the pre-shared client_id and client_secret and enter them in claude.ai's Advanced connector settings."
+    );
   }
 
   let body: DcrRequest;

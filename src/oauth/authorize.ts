@@ -5,9 +5,11 @@
 // is no consent page. We validate the request, mint a one-time auth code,
 // and 302 the browser back to redirect_uri with ?code=...&state=....
 //
-// Security note: anyone who reaches this endpoint can obtain a token. That is
-// the trade-off Rene approved for v1 — partners must keep their Worker URL
-// private. Phase 11.1+ may add a consent UI.
+// Security note: in public-client mode (OAUTH_CLIENT_ID/SECRET unset) anyone
+// who reaches this endpoint can obtain a token — partners must keep their
+// Worker URL private. Phase 11.1 confidential mode closes this: client_id
+// must match the pre-shared OAUTH_CLIENT_ID here, and /token additionally
+// requires the client_secret, so the URL alone is no longer sufficient.
 //
 // Error handling per RFC 6749 §4.1.2.1:
 //   - If client_id or redirect_uri is invalid (or doesn't match), respond
@@ -19,7 +21,9 @@
 // -----------------------------------------------------------------------------
 
 import { corsResponse, jsonResponse } from "../cors";
+import { confidentialClientConfigured } from "./confidential";
 import { randomToken } from "./jwt";
+import { ALLOWED_REDIRECT_URIS } from "./register";
 import type { Env } from "../types";
 
 interface ClientRow {
@@ -61,36 +65,57 @@ export async function handleAuthorize(
     );
   }
 
-  const client = await env.DB.prepare(
-    "SELECT client_id, redirect_uris FROM oauth_clients WHERE client_id = ?"
-  )
-    .bind(clientId)
-    .first<ClientRow>();
+  if (confidentialClientConfigured(env)) {
+    // Phase 11.1 — the only valid client is the pre-shared one. There is no
+    // DCR row for it, so redirect_uri is checked against the same static
+    // allowlist /register enforces in public mode.
+    if (clientId !== env.OAUTH_CLIENT_ID) {
+      return jsonResponse(
+        { error: "invalid_client", error_description: "unknown client_id" },
+        { status: 400 }
+      );
+    }
+    if (!ALLOWED_REDIRECT_URIS.has(redirectUri)) {
+      return jsonResponse(
+        {
+          error: "invalid_redirect_uri",
+          error_description: "redirect_uri is not on the allowlist",
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    const client = await env.DB.prepare(
+      "SELECT client_id, redirect_uris FROM oauth_clients WHERE client_id = ?"
+    )
+      .bind(clientId)
+      .first<ClientRow>();
 
-  if (!client) {
-    return jsonResponse(
-      { error: "invalid_client", error_description: "client_id not registered" },
-      { status: 400 }
-    );
-  }
+    if (!client) {
+      return jsonResponse(
+        { error: "invalid_client", error_description: "client_id not registered" },
+        { status: 400 }
+      );
+    }
 
-  let registered: string[];
-  try {
-    registered = JSON.parse(client.redirect_uris) as string[];
-  } catch {
-    return jsonResponse(
-      { error: "server_error", error_description: "client record is corrupt" },
-      { status: 500 }
-    );
-  }
-  if (!registered.includes(redirectUri)) {
-    return jsonResponse(
-      {
-        error: "invalid_redirect_uri",
-        error_description: "redirect_uri does not match the one registered for this client",
-      },
-      { status: 400 }
-    );
+    let registered: string[];
+    try {
+      registered = JSON.parse(client.redirect_uris) as string[];
+    } catch {
+      return jsonResponse(
+        { error: "server_error", error_description: "client record is corrupt" },
+        { status: 500 }
+      );
+    }
+    if (!registered.includes(redirectUri)) {
+      return jsonResponse(
+        {
+          error: "invalid_redirect_uri",
+          error_description: "redirect_uri does not match the one registered for this client",
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // -- Post-redirect validation (errors redirect with query params) ------
