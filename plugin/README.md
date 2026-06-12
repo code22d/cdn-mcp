@@ -2,13 +2,20 @@
 
 This plugin installs the `cdn-file-upload` skill, which gives Cowork sessions
 operational know-how for uploading files to a personal CDN built on Cloudflare
-R2 + Workers + D1. For trivially small files (≤ 1 MB) the skill uploads
-directly through the MCP; for anything larger it prints a `cdn upload` command
-for you to run via the local CLI. A signed-URL `.command` script is offered as
-a fallback if the CLI isn't installed yet.
+R2 + Workers + D1. Every upload goes through a clickable script that runs the
+local `cdn` CLI on your machine — no size limits, no base64 round-trips. The
+MCP connector is still used for metadata and post-upload verification.
 
 This plugin doesn't bundle the CDN itself — the Worker and the CLI have their
 own install paths, referenced below.
+
+## What changed in v0.4.0
+
+v0.4.0 (2026-06-11): The cdn-file-upload skill now uses Path E (clickable
+script + local CLI) for all uploads regardless of file size. Path A
+(base64-over-MCP) removed. Plus auto-sanitizes filenames with spaces or
+special characters before uploading; partners are shown the proposed clean
+name and can override before the script runs.
 
 ## What changed in v0.3.1
 
@@ -46,17 +53,18 @@ MCP, a custom domain for public assets, and an `MCP_AUTH_TOKEN` secret.
 
 claude.ai → Settings → Customize → Connectors → Add custom connector.
 
-URL: `https://cdn-mcp.<your-domain>/mcp/<your-MCP_AUTH_TOKEN>`
+- **Remote MCP server URL:** `https://cdn-mcp.<your-domain>/mcp`
+- **Advanced settings → OAuth Client ID / Client Secret:** the
+  `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET` values from your Worker deploy
+  (the cdn-setup skill generates and walks you through these).
 
 Verify all 13 tools (`cdn_upload_file`, `cdn_list_files`, `cdn_signed_upload_url`,
 `cdn_finalize_upload`, `cdn_help`, etc.) appear in any Cowork session.
 
-### 3. Install the local CLI (required for non-trivial uploads)
+### 3. Install the local CLI (required for all uploads)
 
-The skill defaults to the CLI for anything larger than ~1 MB. Without it, the
-skill falls back to a `.command` script you have to double-click for every
-upload — workable for day-1 partners, but the CLI is the smooth path. Install
-it once:
+Every upload runs through the CLI via the skill's clickable script — there is
+no MCP fallback path anymore. Install it once:
 
 ```bash
 gh release download v0.1.0 \
@@ -71,23 +79,28 @@ cdn version  # should print 0.1.0
 Then create `~/.cdn-cli/config.json` with your R2 access keys + MCP token. See
 the cdn-cli README for the config schema.
 
-The skill assumes the CLI is installed and prints a `cdn upload` command for
-the user to run. If `cdn: command not found` comes back, the skill falls back
-to the `.command` script flow and re-prints the install command above.
+The skill assumes the CLI is installed and generates the upload script
+straight away. If `cdn: command not found` comes back from your terminal, the
+skill re-prints the install command above and you re-run the same script.
 
 ## What the skill does (after setup)
 
-When you ask Cowork to "upload `<files>` to the CDN", the skill picks the
-right transport based on file size:
+When you ask Cowork to "upload `<files>` to the CDN", the skill generates a
+clickable upload script (`.command` on macOS, `.sh` on Linux, `.bat` on
+Windows) that runs the local `cdn` CLI — for every upload, regardless of
+size. You double-click the script; it streams the bytes to R2 and verifies
+the public URL; the skill confirms via `cdn_get_stats` after you report back.
 
-| Path | When | How |
-|---|---|---|
-| **A** — direct base64 (MCP) | Single file ≤ 1 MB and batch ≤ 10 files | `cdn_upload_file` from the parent session — zero friction, no terminal needed |
-| **E** — local CLI (default) | Anything else | Skill prints `cdn upload <project> <abs-path>` (or `cdn upload-dir …`); you run it in your terminal; skill verifies via `cdn_get_stats` |
-| **C** — signed URL + `.command` (fallback) | CLI not installed | Generates a `.command` script you double-click to run `curl` from your local terminal — and prints the install command so the next upload skips this step |
+If the filename contains characters that don't URL-encode cleanly (spaces,
+parens, unicode, etc.), the skill proposes a sanitized name first — you can
+accept it or supply your own before the script is generated.
+
+If the CLI isn't installed yet, the script's terminal output says so plainly
+and the skill walks you through the one-time install, then you re-run the
+same script.
 
 Compression is opt-in: if you ask the skill to compress images first, it will;
-otherwise Path E preserves the originals regardless of size.
+otherwise the originals are preserved regardless of size.
 
 See `~/.claude/skills/cdn-file-upload/SKILL.md` (installed by this plugin) for
 the full decision tree, error handling, and sample interactions.
@@ -104,8 +117,8 @@ docs. The MCP connector is added separately (step 2 above).
 ## Versioning
 
 This plugin's version (in `plugin.json`) tracks independently from the
-cdn-mcp Worker (`0.1.0-phase5a`) and the cdn-cli (`v0.1.0`). Current release:
-`plugin-v0.2.0` (simplified routing; CLI-first by default).
+cdn-mcp Worker (`0.1.0-phase11.1`) and the cdn-cli (`v0.1.0`). Current release:
+`plugin-v0.4.0` (Path E only; filename sanitization).
 
 Plugin releases are tagged as `plugin-vX.Y.Z` on the cdn-mcp repo to
 distinguish them from Worker versions like `v0.1.0-phase5a`.
@@ -120,7 +133,7 @@ button is the actual installer.
 1. **Download the .plugin** to a Cowork-accessible folder:
 
    ```bash
-   gh release download plugin-v0.2.0 \
+   gh release download plugin-v0.4.0 \
      --repo code22d/cdn-mcp \
      --pattern "*.plugin" \
      --dir /tmp

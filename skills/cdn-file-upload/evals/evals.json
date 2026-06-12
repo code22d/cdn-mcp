@@ -5,35 +5,35 @@
       "id": 1,
       "name": "single-small-file",
       "prompt": "I have a hero image at /tmp/test-fixtures/blog/hero.png — it's 412 KB. I want to host it on cdn.22d.app under the 'blog' project. Walk me through exactly what you'd do — which cdn-mcp tools you'd call, in what order, and what the user-facing output would be at the end. Don't actually call the tools yet; this is a dry-run planning pass.",
-      "expected_output": "Skill should pick Path A (direct base64). Single call to cdn_upload_file with project='blog', name='hero.png', content_type='image/png'. Final output is a one-line summary with the public URL.",
+      "expected_output": "Path E even though the file is small — there is no size-based routing. Skill should describe writing a clickable upload script (.command/.sh/.bat per detected OS) containing `cdn upload \"blog\" \"/tmp/test-fixtures/blog/hero.png\"`, chmod +x, present_files, wait for the user's 'done', then verify with cdn_get_stats. Should NOT call cdn_upload_file or any base64 flow.",
       "files": []
     },
     {
       "id": 2,
       "name": "medium-batch",
       "prompt": "I've got 8 blog post images at /tmp/test-fixtures/blog/2026-05/ — they range from 200 KB to about 2 MB each, all PNGs. I want them on cdn.22d.app in project 'blog'. What's your plan? Which tools would you call and how? Don't actually upload anything — just describe the approach and what I'd see at the end.",
-      "expected_output": "Skill should pick Path B (subagent fan-out) since batch >5 files but each <3 MB. Should describe spawning 8 subagents in parallel, each reading + base64-encoding + calling cdn_upload_file, returning only URLs. Parent collects 8 URLs into a clean summary.",
+      "expected_output": "Path E directory batch: a single clickable script with one `cdn upload-dir \"blog\" \"/tmp/test-fixtures/blog/2026-05\"` line. No subagents, no per-file base64, no per-file curl verification (stats delta is canonical for directories). Verify via cdn_get_stats after the user reports done.",
       "files": []
     },
     {
       "id": 3,
-      "name": "large-images-no-quality-pref",
-      "prompt": "I want to upload all 17 PNGs from /tmp/test-fixtures/decks/Q2-pitch/ to my CDN under the 'decks' project. The files are all between 6 and 8 MB each. Plan it out for me — which approach would you take and why? Don't actually run anything yet.",
-      "expected_output": "Files are >3 MB images and user hasn't specified quality. Skill should ASK the compression-vs-preserve question before picking a path. The plan should branch: if compress → Path D, if preserve → Path C with .command file written to ~/Documents/Claude/Projects/CDN w MCP/uploads/.",
+      "name": "unsafe-filename-sanitization",
+      "prompt": "Upload '/tmp/test-fixtures/decks/Q3 Report (FINAL).pdf' to project 'proposals' on cdn.22d.app. Walk me through the plan first — dry-run only.",
+      "expected_output": "Skill should detect the unsafe basename (spaces + parens) and show the proposed sanitized name `Q3_Report__FINAL_.pdf` BEFORE generating the script, offering the user the chance to supply a different name. The script's `cdn upload` line keeps the original source path quoted and adds --name with the sanitized (or user-chosen) name; the verification URL uses the sanitized name.",
       "files": []
     },
     {
       "id": 4,
       "name": "large-video-single",
       "prompt": "Upload /tmp/test-fixtures/videos/q2-demo.mp4 (180 MB, video/mp4) to project 'videos' on cdn.22d.app. Walk me through your plan first — which tools, what files you'd write, what I'd need to do. Dry-run only.",
-      "expected_output": "180 MB non-image → Path C, no compression question. Should call cdn_signed_upload_url, write upload-q2-demo.command (or similar) to ~/Documents/Claude/Projects/CDN w MCP/uploads/, instruct user to double-click in Finder, wait for confirmation, then call cdn_finalize_upload, then verify with cdn_get_stats.",
+      "expected_output": "Path E: write upload-q2-demo.mp4.command (or .sh/.bat per OS) containing `cdn upload \"videos\" \"/tmp/test-fixtures/videos/q2-demo.mp4\"` plus the curl HEAD self-verification, chmod +x, present_files, wait for 'done', then cdn_get_stats. Should NOT mention cdn_signed_upload_url or cdn_finalize_upload — the skill no longer invokes the MCP upload tools.",
       "files": []
     },
     {
       "id": 5,
       "name": "mixed-batch",
       "prompt": "I have a folder /tmp/test-fixtures/mixed/ with: three 50 KB thumbnail PNGs, one 4 MB hero JPG (I want this one preserved as-is, no compression), and one 120 MB MP4. All going to project 'launch'. What's the plan? Don't actually call the tools — just lay it out.",
-      "expected_output": "Skill should classify each file independently and group by chosen path. Three thumbnails → Path A (or B). The 4 MB JPG with explicit 'preserve' → Path C. The 120 MB MP4 → Path C. Should describe two phases: small files via MCP, then a single .command script bundling the JPG + MP4. Should NOT force every file through one path.",
+      "expected_output": "One path for everything: a single Path E script. Either one `cdn upload-dir \"launch\" \"/tmp/test-fixtures/mixed\"` line, or back-to-back `cdn upload` lines for the discrete files. No size-based splitting, no MCP base64 for the thumbnails, no compression (preserve is the default — compression is opt-in only). Verify via cdn_get_stats after the user reports done.",
       "files": []
     }
   ]
