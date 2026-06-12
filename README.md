@@ -64,17 +64,19 @@ If a Notion doc and this README disagree, Notion wins. Update the README.
 One path: install the **cdn-setup Cowork skill**, then ask Claude to walk you through it.
 
 **Option A — Click to download (no setup):**
-[cdn-setup-v0.1.0.skill](https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.1.0/cdn-setup.skill)
+[cdn-setup-v0.2.0.skill](https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.2.0/cdn-setup.skill)
 
 **Option B — GitHub CLI:**
 ```bash
-gh release download cdn-setup-v0.1.0 --repo code22d/cdn-mcp --pattern "*.skill" --dir ~/Downloads
+gh release download cdn-setup-v0.2.0 --repo code22d/cdn-mcp --pattern "*.skill" --dir ~/Downloads
 ```
 
 **Option C — curl (Mac/Linux):**
 ```bash
-curl -L -o ~/Downloads/cdn-setup.skill https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.1.0/cdn-setup.skill
+curl -L -o ~/Downloads/cdn-setup.skill https://github.com/code22d/cdn-mcp/releases/download/cdn-setup-v0.2.0/cdn-setup.skill
 ```
+
+> Partners will get an OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET during the deploy walkthrough. Both must be pasted into claude.ai's Advanced settings when adding the custom connector. Keep them safe.
 
 In a Cowork session, ask Claude:
 
@@ -84,11 +86,11 @@ Claude will surface the file as a card — click **Save** to install. Then open 
 
 > *"set me up with my own personal CDN"*
 
-The skill orchestrates the full 6-phase setup (~30–60 min): Cloudflare account + R2, prereq installs, Worker deploy, CLI install, Cowork connector setup, end-to-end smoke test. It generates clickable `.command` scripts you double-click on your host for the parts that need real-machine access, and drives the Cloudflare and claude.ai dashboards via the Chrome MCP when available (falls back to manual click-and-paste otherwise).
+The skill orchestrates the full 6-phase setup (~30–60 min): Cloudflare account + R2, prereq installs, Worker deploy (which generates your OAuth credentials), CLI install, claude.ai Custom Connector setup, end-to-end smoke test. It generates clickable `.command` scripts you double-click on your host for the parts that need real-machine access; Cloudflare and claude.ai dashboard steps are manual click-and-paste with direct URLs (those dashboards block browser automation).
 
 Requires a Cloudflare account (free tier is enough; credit card needed for R2 subscription even at $0 usage), a few minutes of focused attention, and optionally a domain on Cloudflare DNS for branded URLs.
 
-See the [cdn-setup release notes](https://github.com/code22d/cdn-mcp/releases/tag/cdn-setup-v0.1.0) for the latest setup details.
+See the [cdn-setup release notes](https://github.com/code22d/cdn-mcp/releases/tag/cdn-setup-v0.2.0) for the latest setup details.
 
 ---
 
