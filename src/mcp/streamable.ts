@@ -18,6 +18,7 @@ import { verifyJwt, type AccessTokenPayload } from "../oauth/jwt";
 import { issuerFromRequest } from "../oauth/metadata";
 import { requireSigningKey } from "../oauth/signing-key";
 import type { Env } from "../types";
+import { OWNER_PRINCIPAL } from "../principals";
 
 export async function handleStreamable(
   request: Request,
@@ -38,7 +39,9 @@ async function handleStreamablePost(request: Request, env: Env): Promise<Respons
   if (auth instanceof Response) return auth;
   // The existing handleMcp does the JSON-RPC dispatch and already enforces
   // CORS on its responses. The /mcp/<token> path uses the same function.
-  return handleMcp(request, env);
+  // OAuth tokens are the owner's single-user connector (auto-approve flow,
+  // sub "cdn-user") — they keep all-project access.
+  return handleMcp(request, env, OWNER_PRINCIPAL);
 }
 
 // -----------------------------------------------------------------------------

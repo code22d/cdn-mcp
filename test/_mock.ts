@@ -17,6 +17,7 @@
 // -----------------------------------------------------------------------------
 
 import type { Env, ToolContext, ToolResult } from "../src/types";
+import type { Principal } from "../src/principals";
 
 // -----------------------------------------------------------------------------
 // Row shapes — match the D1 migration in migrations/0001_init.sql.
@@ -398,7 +399,11 @@ export class MockStatement {
     if (sql.includes("FROM projects p") && sql.includes("LEFT JOIN files f")) {
       let projects = [...this.store.projects];
       let i = 0;
-      if (sql.includes("WHERE p.name > ?")) {
+      if (sql.includes("p.name = ?")) {
+        const only = this.boundArgs[i++] as string;
+        projects = projects.filter((p) => p.name === only);
+      }
+      if (sql.includes("p.name > ?")) {
         const cur = this.boundArgs[i++] as string;
         projects = projects.filter((p) => p.name > cur);
       }
@@ -532,12 +537,15 @@ export function seedR2(
   store.r2.set(key, { bytes, contentType, cacheControl });
 }
 
-export function makeCtx(store: MockStore): ToolContext {
+export function makeCtx(store: MockStore, principal?: Principal): ToolContext {
   return {
     env: makeEnv(store),
     request: new Request("https://cdn-mcp.example/mcp/test-token", {
       method: "POST",
     }),
+    // Phase 1–5a tests predate principals and exercise handlers as the
+    // owner; phase 12 passes a scoped principal explicitly.
+    principal: principal ?? { project: "*" },
   };
 }
 

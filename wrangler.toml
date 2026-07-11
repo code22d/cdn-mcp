@@ -17,6 +17,11 @@
 #        npx wrangler d1 create cdn-db
 #   3. Apply the initial migration:
 #        npx wrangler d1 migrations apply cdn-db --remote
+#   3b. (Phase 12, optional) Per-project principals — JSON map of gateway
+#       token → { project }. A pinned token can only touch its project;
+#       MCP_AUTH_TOKEN and OAuth callers keep "*" (all projects):
+#         printf '{"<token>":{"project":"acme-site"}}' \
+#           | npx wrangler secret put MCP_PRINCIPALS
 #   4. Set the MCP shared secret (and verify it landed):
 #        cat ~/Documents/Claude/Projects/CDN\ w\ MCP/mcp_auth_token.txt | tail -1 \
 #          | npx wrangler secret put MCP_AUTH_TOKEN

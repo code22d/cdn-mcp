@@ -23,6 +23,7 @@
 import assert from "node:assert/strict";
 import { TOOLS } from "../src/mcp/tools/index";
 import { handleMcp } from "../src/mcp/dispatch";
+import { OWNER_PRINCIPAL } from "../src/principals";
 import type { Env } from "../src/types";
 
 const EXPECTED_TOOL_NAMES = [
@@ -151,7 +152,7 @@ async function main() {
           params: {},
         }),
       });
-      const res = await handleMcp(req, stubEnv);
+      const res = await handleMcp(req, stubEnv, OWNER_PRINCIPAL);
       assert.equal(res.status, 200, `expected 200, got ${res.status}`);
       assert.equal(
         res.headers.get("Access-Control-Allow-Origin"),
@@ -194,7 +195,7 @@ async function main() {
           },
         }),
       });
-      const res = await handleMcp(req, stubEnv);
+      const res = await handleMcp(req, stubEnv, OWNER_PRINCIPAL);
       assert.equal(res.status, 200);
       const body = (await res.json()) as {
         jsonrpc: string;

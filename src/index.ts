@@ -27,6 +27,7 @@
 
 import { corsResponse, jsonResponse } from "./cors";
 import { handleMcp } from "./mcp/dispatch";
+import { resolvePathToken } from "./principals";
 import { handleStreamable } from "./mcp/streamable";
 import { handleAuthorize } from "./oauth/authorize";
 import {
@@ -86,16 +87,18 @@ export default {
       return handleStreamable(request, env);
     }
 
-    // -- Legacy /mcp/<token> (Cowork plugin) -----------------------------
+    // -- Legacy /mcp/<token> (Cowork plugin + per-project principals) ----
     if (path.startsWith("/mcp/")) {
       const urlToken = path.slice("/mcp/".length);
-      // Constant-time compare not strictly necessary here — a 404 leaks no
-      // timing info beyond "this URL doesn't exist" — but we keep the auth
-      // failure indistinguishable from "no MCP server here" by returning 404.
-      if (!env.MCP_AUTH_TOKEN || urlToken !== env.MCP_AUTH_TOKEN) {
+      // Phase 12: the token is either MCP_AUTH_TOKEN (owner, all projects)
+      // or an entry in the MCP_PRINCIPALS map (pinned to one project). All
+      // candidates are compared in constant time; unknown tokens keep
+      // getting the indistinguishable 404.
+      const principal = resolvePathToken(urlToken, env);
+      if (principal === null) {
         return corsResponse("Not Found", { status: 404 });
       }
-      return handleMcp(request, env);
+      return handleMcp(request, env, principal);
     }
 
     return corsResponse("Not Found", { status: 404 });

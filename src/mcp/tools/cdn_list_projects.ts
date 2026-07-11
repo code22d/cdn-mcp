@@ -14,6 +14,7 @@
 // -----------------------------------------------------------------------------
 
 import type { Tool } from "../../types";
+import { ALL_PROJECTS } from "../../principals";
 import {
   decodeCursor,
   encodeCursor,
@@ -96,11 +97,18 @@ export const cdn_list_projects: Tool = {
     // SQL — LEFT JOIN keeps empty projects visible.
     // -------------------------------------------------------------------
     const binds: unknown[] = [];
-    let whereClause = "";
+    const conditions: string[] = [];
+    // Phase 12: a scoped principal only ever sees its own project — other
+    // tenants' names/counts/sizes must not leak through this listing.
+    if (ctx.principal.project !== ALL_PROJECTS) {
+      conditions.push("p.name = ?");
+      binds.push(ctx.principal.project);
+    }
     if (cursorData !== null) {
-      whereClause = "WHERE p.name > ?";
+      conditions.push("p.name > ?");
       binds.push(cursorData.lastName);
     }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const sql = `
       SELECT p.name AS name,

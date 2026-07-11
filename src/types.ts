@@ -2,6 +2,8 @@
 // Shared types for the cdn-mcp Worker.
 // -----------------------------------------------------------------------------
 
+import type { Principal } from "./principals";
+
 export interface Env {
   // Bindings
   ASSETS: R2Bucket;
@@ -20,6 +22,14 @@ export interface Env {
 
   // Secrets (set via `wrangler secret put`)
   MCP_AUTH_TOKEN: string;
+  /**
+   * Phase 12 per-project principals — JSON map of gateway token →
+   * { project }. A token pinned to a project can only touch that project;
+   * "*" grants all projects (what MCP_AUTH_TOKEN and OAuth callers get).
+   * Optional: when unset, only MCP_AUTH_TOKEN + OAuth work (all-project).
+   * See src/principals.ts.
+   */
+  MCP_PRINCIPALS?: string;
   /**
    * R2 S3-compatible API access key ID — used to sign presigned PUT URLs
    * for cdn_signed_upload_url. Created via the R2 dashboard's "Manage R2
@@ -75,6 +85,13 @@ export interface JsonRpcResponse {
 export interface ToolContext {
   env: Env;
   request: Request;
+  /**
+   * The authenticated caller's project scope (Phase 12). Tool arguments have
+   * already been forced to this project by the dispatcher for scoped
+   * principals; handlers that query across projects (cdn_list_projects)
+   * must additionally filter by it. `{ project: "*" }` = owner, no scoping.
+   */
+  principal: Principal;
 }
 
 /** A registered MCP tool. */

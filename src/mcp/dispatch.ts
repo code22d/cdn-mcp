@@ -27,15 +27,21 @@ import type {
   ToolResult,
 } from "../types";
 import { TOOLS } from "./tools/index";
+import { applyPrincipal, type Principal } from "../principals";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = { name: "cdn-mcp", version: "0.1.0-phase4.1" };
 
 /**
- * Top-level handler for POST /mcp/<token>. The router has already verified
- * the token matches env.MCP_AUTH_TOKEN before this is called.
+ * Top-level handler for POST /mcp/<token> and Bearer /mcp. The router has
+ * already authenticated the caller and resolved its principal (Phase 12) —
+ * scoped principals get every project-addressed argument overridden below.
  */
-export async function handleMcp(request: Request, env: Env): Promise<Response> {
+export async function handleMcp(
+  request: Request,
+  env: Env,
+  principal: Principal
+): Promise<Response> {
   if (request.method !== "POST") {
     return corsResponse("Method Not Allowed", { status: 405 });
   }
@@ -47,7 +53,7 @@ export async function handleMcp(request: Request, env: Env): Promise<Response> {
     return jsonResponse(rpcError(null, -32700, "Parse error"));
   }
 
-  const ctx: ToolContext = { env, request };
+  const ctx: ToolContext = { env, request, principal };
 
   // Batch support per JSON-RPC 2.0
   if (Array.isArray(payload)) {
@@ -115,7 +121,8 @@ async function dispatch(
             isError: true,
           } satisfies ToolResult);
         }
-        const result = await invokeTool(tool, params.arguments ?? {}, ctx);
+        const forcedArgs = applyPrincipal(tool.name, params.arguments ?? {}, ctx.principal);
+        const result = await invokeTool(tool, forcedArgs, ctx);
         return rpcOk(id, result);
       }
 
