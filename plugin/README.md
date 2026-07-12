@@ -2,12 +2,34 @@
 
 This plugin installs the `cdn-file-upload` skill, which gives Cowork sessions
 operational know-how for uploading files to a personal CDN built on Cloudflare
-R2 + Workers + D1. Every upload goes through a clickable script that runs the
-local `cdn` CLI on your machine — no size limits, no base64 round-trips. The
-MCP connector is still used for metadata and post-upload verification.
+R2 + Workers + D1. The skill probes the sandbox's network egress and adapts: it
+either uploads directly (zero-click) or hands you a clickable script that runs
+the local `cdn` CLI on your machine. No size limits, no base64 round-trips
+either way. The MCP connector supplies the signed URL and handles metadata and
+post-upload verification.
 
 This plugin doesn't bundle the CDN itself — the Worker and the CLI have their
 own install paths, referenced below.
+
+## What changed in v0.5.0
+
+v0.5.0 (2026-07-12): **Adaptive upload.** If the session's sandbox has egress to
+the CDN, the skill now uploads zero-click via signed URL + direct PUT + finalize
++ HEAD verify — no clickable script needed. If egress is blocked (or the source
+file isn't sandbox-readable), it falls back to the existing Path E
+clickable-script flow.
+
+Zero-click needs the Cowork egress allowlist to cover **both** `cdn.22d.app` and
+the R2 upload endpoint (`<account>.r2.cloudflarestorage.com`) — with only the
+first, the skill's probe passes but the byte transfer is blocked, and Path E
+kicks in automatically. Reachability is probed **per session, never cached
+across sessions**, because Cowork's allowlist only applies to sessions started
+after the setting changed.
+
+The "What NOT to do" section from v0.4.1 is preserved and sharpened. Direct
+`cdn_upload_file` remains forbidden regardless of path — and as of Worker Phase
+11.3 it hard-rejects external callers, so it now fails loudly instead of
+quietly working.
 
 ## What changed in v0.4.1
 
@@ -73,10 +95,11 @@ claude.ai → Settings → Customize → Connectors → Add custom connector.
 Verify all 13 tools (`cdn_upload_file`, `cdn_list_files`, `cdn_signed_upload_url`,
 `cdn_finalize_upload`, `cdn_help`, etc.) appear in any Cowork session.
 
-### 3. Install the local CLI (required for all uploads)
+### 3. Install the local CLI (required for the script fallback)
 
-Every upload runs through the CLI via the skill's clickable script — there is
-no MCP fallback path anymore. Install it once:
+When the sandbox has no egress, every upload runs through the CLI via the
+skill's clickable script. Zero-click sessions don't need the CLI, but you can't
+predict which sessions those will be — install it once:
 
 ```bash
 gh release download v0.1.0 \
@@ -91,17 +114,38 @@ cdn version  # should print 0.1.0
 Then create `~/.cdn-cli/config.json` with your R2 access keys + MCP token. See
 the cdn-cli README for the config schema.
 
-The skill assumes the CLI is installed and generates the upload script
-straight away. If `cdn: command not found` comes back from your terminal, the
-skill re-prints the install command above and you re-run the same script.
+On the script path, the skill assumes the CLI is installed and generates the
+script straight away. If `cdn: command not found` comes back from your terminal,
+the skill re-prints the install command above and you re-run the same script.
+
+### 4. (Optional) Allowlist the CDN hosts for zero-click uploads
+
+claude.ai → Settings → Cowork → network egress allowlist. Add **both**:
+
+- `cdn.22d.app` — the public CDN host (also the skill's probe + verify target)
+- `<account>.r2.cloudflarestorage.com` — the R2 S3 endpoint the presigned PUT
+  actually targets
+
+Both are required. With only the first, the probe passes but the byte transfer
+is refused, and the skill falls back to the script automatically. Allowlist
+changes apply only to **sessions started after** the change.
 
 ## What the skill does (after setup)
 
-When you ask Cowork to "upload `<files>` to the CDN", the skill generates a
-clickable upload script (`.command` on macOS, `.sh` on Linux, `.bat` on
-Windows) that runs the local `cdn` CLI — for every upload, regardless of
-size. You double-click the script; it streams the bytes to R2 and verifies
-the public URL; the skill confirms via `cdn_get_stats` after you report back.
+When you ask Cowork to "upload `<files>` to the CDN", the skill first probes
+whether this session's sandbox can reach the CDN, then takes one of two paths:
+
+- **Zero-click** (egress open, file readable from the sandbox): the skill mints
+  a signed R2 URL, PUTs the bytes itself, finalizes the metadata, HEAD-verifies
+  the public URL, and hands you the link. You do nothing after confirming the
+  project name.
+- **Clickable script** (egress blocked, or the file lives somewhere Cowork can't
+  see): the skill generates `.command` / `.sh` / `.bat` per your OS that runs
+  the local `cdn` CLI. You double-click it; it streams the bytes to R2 and
+  verifies the public URL; the skill confirms via `cdn_get_stats` after you
+  report back.
+
+Same result either way, and neither path ever base64-encodes your file.
 
 If the filename contains characters that don't URL-encode cleanly (spaces,
 parens, unicode, etc.), the skill proposes a sanitized name first — you can
@@ -121,7 +165,7 @@ the full decision tree, error handling, and sample interactions.
 
 | Component | Purpose |
 |---|---|
-| **Skill** (`cdn-file-upload`) | Decision tree + transport patterns for uploading files of any size to the personal CDN |
+| **Skill** (`cdn-file-upload`) | Egress probe + adaptive transport (zero-click or clickable script) for uploading files of any size to the personal CDN |
 
 No commands, no MCP servers, no agents, no hooks. The plugin is pure skill +
 docs. The MCP connector is added separately (step 2 above).
@@ -129,8 +173,8 @@ docs. The MCP connector is added separately (step 2 above).
 ## Versioning
 
 This plugin's version (in `plugin.json`) tracks independently from the
-cdn-mcp Worker (`0.1.0-phase11.1`) and the cdn-cli (`v0.1.0`). Current release:
-`plugin-v0.4.0` (Path E only; filename sanitization).
+cdn-mcp Worker (`0.1.0-phase11.3`) and the cdn-cli (`v0.1.0`). Current release:
+`plugin-v0.5.0` (adaptive zero-click upload; clickable-script fallback).
 
 Plugin releases are tagged as `plugin-vX.Y.Z` on the cdn-mcp repo to
 distinguish them from Worker versions like `v0.1.0-phase5a`.
@@ -145,7 +189,7 @@ button is the actual installer.
 1. **Download the .plugin** to a Cowork-accessible folder:
 
    ```bash
-   gh release download plugin-v0.4.0 \
+   gh release download plugin-v0.5.0 \
      --repo code22d/cdn-mcp \
      --pattern "*.plugin" \
      --dir /tmp

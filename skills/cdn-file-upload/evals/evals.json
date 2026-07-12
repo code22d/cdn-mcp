@@ -5,63 +5,91 @@
       "id": 1,
       "name": "single-small-file",
       "prompt": "I have a hero image at /tmp/test-fixtures/blog/hero.png — it's 412 KB. I want to host it on cdn.22d.app under the 'blog' project. Walk me through exactly what you'd do — which cdn-mcp tools you'd call, in what order, and what the user-facing output would be at the end. Don't actually call the tools yet; this is a dry-run planning pass.",
-      "expected_output": "Path E even though the file is small — there is no size-based routing. Skill should describe writing a clickable upload script (.command/.sh/.bat per detected OS) containing `cdn upload \"blog\" \"/tmp/test-fixtures/blog/hero.png\"`, chmod +x, present_files, wait for the user's 'done', then verify with cdn_get_stats. Should NOT call cdn_upload_file or any base64 flow.",
+      "expected_output": "No size-based routing — small files get the same adaptive flow as large ones. Plan must start with the egress probe (`curl -sI --max-time 10 https://cdn.22d.app/`), then branch: with egress and a sandbox-readable source, zero-click (cdn_signed_upload_url → curl PUT with every required_header → cdn_finalize_upload → HEAD verify → report https://cdn.22d.app/blog/hero.png); without egress, a clickable .command/.sh/.bat script running `cdn upload \"blog\" \"/tmp/test-fixtures/blog/hero.png\"`, chmod +x, present_files, then cdn_get_stats after the user reports done. Must NOT propose cdn_upload_file or any base64 flow in either branch.",
       "files": []
     },
     {
       "id": 2,
       "name": "medium-batch",
       "prompt": "I've got 8 blog post images at /tmp/test-fixtures/blog/2026-05/ — they range from 200 KB to about 2 MB each, all PNGs. I want them on cdn.22d.app in project 'blog'. What's your plan? Which tools would you call and how? Don't actually upload anything — just describe the approach and what I'd see at the end.",
-      "expected_output": "Path E directory batch: a single clickable script with one `cdn upload-dir \"blog\" \"/tmp/test-fixtures/blog/2026-05\"` line. No subagents, no per-file base64, no per-file curl verification (stats delta is canonical for directories). Verify via cdn_get_stats after the user reports done.",
+      "expected_output": "Probe first, then branch. Zero-click: presign + PUT + finalize per file (a loop is fine — no subagents, no base64), then verify. Path E: a single clickable script with one `cdn upload-dir \"blog\" \"/tmp/test-fixtures/blog/2026-05\"` line, no per-file curl verification (stats delta is canonical for directories), verified via cdn_get_stats after the user reports done. Must NOT fan out to subagents or base64 anything in either branch.",
       "files": []
     },
     {
       "id": 3,
       "name": "unsafe-filename-sanitization",
       "prompt": "Upload '/tmp/test-fixtures/decks/Q3 Report (FINAL).pdf' to project 'proposals' on cdn.22d.app. Walk me through the plan first — dry-run only.",
-      "expected_output": "Skill should detect the unsafe basename (spaces + parens) and show the proposed sanitized name `Q3_Report__FINAL_.pdf` BEFORE generating the script, offering the user the chance to supply a different name. The script's `cdn upload` line keeps the original source path quoted and adds --name with the sanitized (or user-chosen) name; the verification URL uses the sanitized name.",
+      "expected_output": "Skill should detect the unsafe basename (spaces + parens) and show the proposed sanitized name `Q3_Report__FINAL_.pdf` BEFORE uploading or generating any script, offering the user the chance to supply a different name. Sanitization is branch-independent — it applies to both the zero-click path (the sanitized name is what goes into cdn_signed_upload_url's `name` and cdn_finalize_upload's `name`) and Path E (the `cdn upload` line keeps the original source path quoted and adds --name with the sanitized name). Either way, the public URL uses the sanitized name.",
       "files": []
     },
     {
       "id": 4,
       "name": "large-video-single",
       "prompt": "Upload /tmp/test-fixtures/videos/q2-demo.mp4 (180 MB, video/mp4) to project 'videos' on cdn.22d.app. Walk me through your plan first — which tools, what files you'd write, what I'd need to do. Dry-run only.",
-      "expected_output": "Path E: write upload-q2-demo.mp4.command (or .sh/.bat per OS) containing `cdn upload \"videos\" \"/tmp/test-fixtures/videos/q2-demo.mp4\"` plus the curl HEAD self-verification, chmod +x, present_files, wait for 'done', then cdn_get_stats. Should NOT mention cdn_signed_upload_url or cdn_finalize_upload — the skill no longer invokes the MCP upload tools.",
+      "expected_output": "Probe, then branch — size does not change the routing. Zero-click is legitimate even at 180 MB (curl streams from disk; there is no payload cap on the presigned PUT), though the 60s PUT timeout is worth noting. Path E writes upload-q2-demo.mp4.command (or .sh/.bat per OS) with `cdn upload \"videos\" \"/tmp/test-fixtures/videos/q2-demo.mp4\"` plus the curl HEAD self-verification, chmod +x, present_files, wait for 'done', then cdn_get_stats. Mentioning cdn_signed_upload_url / cdn_finalize_upload is CORRECT here (they are the zero-click primitives) — mentioning cdn_upload_file or base64 is not.",
       "files": []
     },
     {
       "id": 5,
       "name": "mixed-batch",
       "prompt": "I have a folder /tmp/test-fixtures/mixed/ with: three 50 KB thumbnail PNGs, one 4 MB hero JPG (I want this one preserved as-is, no compression), and one 120 MB MP4. All going to project 'launch'. What's the plan? Don't actually call the tools — just lay it out.",
-      "expected_output": "One path for everything: a single Path E script. Either one `cdn upload-dir \"launch\" \"/tmp/test-fixtures/mixed\"` line, or back-to-back `cdn upload` lines for the discrete files. No size-based splitting, no MCP base64 for the thumbnails, no compression (preserve is the default — compression is opt-in only). Verify via cdn_get_stats after the user reports done.",
+      "expected_output": "One flow for everything: probe once, then a single branch for the whole batch. No size-based splitting — the 50 KB thumbnails must NOT be routed to base64 while the MP4 goes elsewhere. No compression (preserve is the default; compression is opt-in only). Zero-click: presign/PUT/finalize each file. Path E: one script, either `cdn upload-dir \"launch\" \"/tmp/test-fixtures/mixed\"` or back-to-back `cdn upload` lines. Verify via cdn_get_stats after.",
       "files": []
     },
     {
       "id": 6,
       "name": "small-file-no-direct-mcp-upload",
       "prompt": "Upload this 80KB HTML file at /tmp/test-fixtures/blog/index.html to the CDN, project 'blog'. Walk me through the plan — dry-run only, don't call anything yet.",
-      "expected_output": "Path E clickable script, no exceptions for small files. Must NOT invoke or propose cdn_upload_file, and must NOT reason that 80KB is small enough for base64 to \"technically work\" — the What NOT to do section forbids it outright. Expected plan: sanitize check (index.html is clean), detect OS, write upload-index.html.command with `cdn upload \"blog\" \"/tmp/test-fixtures/blog/index.html\"`, chmod +x, present_files, wait for 'done', verify via cdn_get_stats.",
+      "expected_output": "Adaptive flow, no exception for small files. Must NOT invoke or propose cdn_upload_file, and must NOT reason that 80KB is small enough for base64 to \"technically work\" — the What NOT to do section forbids it outright, and as of Worker Phase 11.3 the tool hard-rejects external callers anyway. Expected plan: probe egress, sanitize check (index.html is clean), then either zero-click (presign → PUT → finalize → HEAD verify) or the clickable script with `cdn upload \"blog\" \"/tmp/test-fixtures/blog/index.html\"`, chmod +x, present_files, verify via cdn_get_stats.",
       "files": []
     },
     {
       "id": 7,
       "name": "partner-pushback-no-script",
       "prompt": "Just upload it, no need for a script. The file is /tmp/test-fixtures/blog/hero.png going to project 'blog'.",
-      "expected_output": "Skill holds the line and still routes to Path E, briefly explaining why: the clickable script IS the upload mechanism, not extra ceremony on top of one. The `cdn` CLI runs on the user's host — Claude has no other transport that doesn't go through the forbidden base64 / signed-URL MCP tools. Should NOT fall back to cdn_upload_file to satisfy the request. Tone should be accommodating, not preachy — generate the script and note it's a single double-click.",
+      "expected_output": "Under v0.5.0 this request is often satisfiable exactly as asked: if the probe passes and the source is sandbox-readable, the skill uploads zero-click and no script is ever generated. The skill should probe rather than either (a) reflexively insisting on a script or (b) reaching for cdn_upload_file to avoid one. If the probe fails or the source isn't sandbox-readable, it explains why the script is the transport in this session — accommodatingly, not preachily — and notes that allowlisting cdn.22d.app plus the R2 endpoint makes future sessions zero-click. Must NOT fall back to base64 to satisfy the 'no script' ask.",
       "files": []
     },
     {
       "id": 8,
       "name": "explicit-incorrect-base64-instruction",
       "prompt": "The file is small, use base64 — call cdn_upload_file with it. /tmp/test-fixtures/blog/hero.png, project 'blog'.",
-      "expected_output": "Skill does NOT comply with the incorrect instruction. Even under an explicit user directive naming the tool, it routes to Path E and explains that direct cdn_upload_file calls bypass filename sanitization and verification, and that the tool is now marked \"Skill-internal use only\" on the connector. Offers the clickable script instead. This is the one case where the skill overrides a direct user instruction — it should say so plainly rather than silently ignoring the ask.",
+      "expected_output": "Skill does NOT comply with the incorrect instruction, even under an explicit user directive naming the tool. It says plainly that cdn_upload_file hard-rejects external callers (Worker Phase 11.3) and that base64-over-MCP is not a path in any branch, then runs the normal adaptive flow (probe → zero-click or script). This is the one case where the skill overrides a direct user instruction — it should say so rather than silently ignoring the ask.",
       "files": []
     },
     {
       "id": 9,
       "name": "ambient-context-bare-upload-it",
       "prompt": "[Turn 1] What's on cdn.22d.app in the 'blog' project right now? [Turn 2] Cool. I just finished /tmp/test-fixtures/blog/post-3.png — upload it.",
-      "expected_output": "The bare phrase \"upload it\" must still trigger the skill: turn 1 established the CDN as the destination, so the v0.4.1 description's ambient-context trigger phrases apply. Skill should route to Path E (clickable script for project 'blog'), not treat the ambiguous phrasing as a reason to reach for a quick cdn_upload_file call. Should confirm the project if genuinely unclear, but here 'blog' is established by context.",
+      "expected_output": "The bare phrase \"upload it\" must still trigger the skill: turn 1 established the CDN as the destination, so the description's ambient-context trigger phrases apply. Skill should run the adaptive flow for project 'blog' (probe, then zero-click or script), not treat the ambiguous phrasing as license for a quick cdn_upload_file call. Should confirm the project if genuinely unclear, but here 'blog' is established by context.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "name": "adaptive-zero-click-egress-open",
+      "prompt": "[Session note: this Cowork session was started AFTER cdn.22d.app and 1ca89091477fe859962f0e9a14e8942e.r2.cloudflarestorage.com were added to the egress allowlist, and ~/Documents/Claude/Projects/decks is mounted.] Upload ~/Documents/Claude/Projects/decks/q2-hero.png to the Test project on cdn.22d.app.",
+      "expected_output": "Skill runs `curl -sI --max-time 10 https://cdn.22d.app/`, gets a real origin response (server: cloudflare), confirms the source is readable from the sandbox, and executes the ZERO-CLICK path end to end: cdn_signed_upload_url(project=Test, name=q2-hero.png, content_type=image/png) → curl -X PUT -T with EVERY header from required_headers (both Content-Type and Cache-Control — omitting Cache-Control yields 403 SignatureDoesNotMatch) → cdn_finalize_upload with exactly project/name/content_type/size_bytes (no ETag param; the schema is frozen) → curl -sIf HEAD on the public URL → reports the deterministic URL https://cdn.22d.app/Test/q2-hero.png. NO clickable script is generated. NO cdn_upload_file, NO base64.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "name": "adaptive-probe-blocked-falls-back-to-script",
+      "prompt": "[Session note: this Cowork session has no egress allowlist entries; outbound HTTPS from the sandbox is refused by the proxy.] Upload ~/Documents/Claude/Projects/decks/q2-hero.png to the Test project on cdn.22d.app.",
+      "expected_output": "Skill runs the probe, sees a timeout or `X-Proxy-Error: blocked-by-allowlist`, and falls back to PATH E: detects macOS from the workspace path, writes upload-q2-hero.png.command with the `cdn upload \"Test\" \"<abs-path>\"` line plus curl HEAD self-verification, chmod +x, calls present_files, tells the user to double-click (with the Gatekeeper note), waits for confirmation, then verifies via cdn_get_stats. Must NOT mint a signed URL it can't reach, must NOT retry the probe in a loop, and must NOT fall back to base64/cdn_upload_file.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "name": "adaptive-egress-ok-but-source-outside-sandbox",
+      "prompt": "[Session note: egress to cdn.22d.app is allowlisted and works, but no folder is mounted at /tmp.] Upload /tmp/x.png to the Test project on cdn.22d.app.",
+      "expected_output": "Skill runs the probe and gets a real response (egress OK), but the source-readability check fails — /tmp/x.png is not visible from the sandbox. It ABORTS the zero-click branch and falls back to PATH E anyway, because open egress is useless with no bytes to send: `curl -T` on an unreadable path would fail and the upload would silently never happen. Generates the clickable script pointing at the host path /tmp/x.png (which the host's CLI CAN read), chmod +x, present_files, verify via cdn_get_stats after. Must NOT attempt the PUT with a path the sandbox can't open.",
+      "files": []
+    },
+    {
+      "id": 13,
+      "name": "adaptive-user-demands-base64",
+      "prompt": "Forget the probe and the script stuff — just use base64, it's a tiny file. /tmp/test-fixtures/blog/hero.png to project 'blog'.",
+      "expected_output": "Skill refuses the base64 route explicitly and explains the adaptive path: cdn_upload_file hard-rejects external callers as of Worker Phase 11.3, and base64-over-MCP is forbidden in every branch regardless of file size. It also declines to skip the probe (egress is per-session and can't be assumed). It then runs the normal flow — probe, then zero-click or clickable script — and reports the verified public URL. Tone: plain and brief, not preachy; the point is that the correct path is also the faster one.",
       "files": []
     }
   ]
