@@ -1,31 +1,34 @@
 // -----------------------------------------------------------------------------
-// cdn_upload_file — Phase 1 real handler. Phase 2 refactored the body out into
-// src/mcp/upload.ts so cdn_replace_file can share it (head-session A1 +
-// Phase 1 A7 — both confirm a single canonical overwrite path).
+// cdn_upload_file — HARD-REJECTED as of Phase 11.3.
 //
-// Flow (delegated to performUpload with requireExisting: false):
-//   1. Validate project + filename + base64.
-//   2. Look up existing (project, name) row in D1.
-//   3. If exists and !replace → error file_exists.
-//   4. Auto-create project (INSERT OR IGNORE) so collisions on the explicit
-//      cdn_create_project path still produce a meaningful "exists" error.
-//   5. R2 PUT the bytes (httpMetadata.contentType set so direct fetches from
-//      cdn.22d.app return the right Content-Type header).
-//   6. D1 INSERT (new file) or UPDATE (replace).
-//      - On INSERT failure: best-effort R2 delete to avoid orphan bytes.
-//      - On UPDATE failure (replace path): return metadata_update_failed —
-//        the new bytes are already at the public URL, the row just didn't
-//        get its version/timestamp bumped. User should retry.
+// History: Phase 1 shipped this as the real base64-over-MCP upload handler,
+// delegating to performUpload (src/mcp/upload.ts). Phase 11.2 rewrote the
+// `description` to redirect callers to the cdn-file-upload skill. Wording alone
+// did not hold: Claude sessions kept reaching for this tool when the user named
+// the MCP explicitly, reading the source file and base64-chunking it into
+// /tmp scratch files before anyone could intervene (observed 2026-07-12).
 //
-// inputSchema is FROZEN as of Phase 0 and remains untouched. Phase 11.2 rewrote
-// the `description` only: partners kept reaching for this tool directly (base64
-// small-file uploads) instead of the cdn-file-upload skill, so the description
-// now redirects to the skill. Behavior is unchanged — this is tool-surface
-// wording, not contract.
+// Phase 11.3 replaces persuasion with enforcement. The handler now returns a
+// structured error immediately — no arg validation, no R2 write, no D1 write.
+// Base64-over-MCP is not a transport anymore; it is an error.
+//
+// Why this is safe to hard-reject: no legitimate caller exists.
+//   - The cdn-file-upload skill (plugin v0.5.0) uploads either zero-click
+//     (cdn_signed_upload_url → direct PUT → cdn_finalize_upload) or via a
+//     clickable script that runs the local `cdn` CLI. Neither touches this tool.
+//   - The @22d/cdn-cli PUTs bytes straight to R2 with its own R2 credentials,
+//     then calls cdn_finalize_upload. It has never called this tool.
+//
+// The write path itself is NOT dead — performUpload survives and still backs
+// cdn_replace_file. Only this tool's external surface is closed.
+//
+// inputSchema and description are UNCHANGED from Phase 11.2 (the schema is
+// FROZEN as of Phase 0; the description was already correct). Phase 11.3 is a
+// behavior change only.
 // -----------------------------------------------------------------------------
 
 import type { Tool } from "../../types";
-import { performUpload } from "../upload";
+import { errorResult } from "../util";
 
 const NAME = "cdn_upload_file";
 
@@ -64,6 +67,18 @@ export const cdn_upload_file: Tool = {
     },
     required: ["project", "name", "content_base64"],
   },
-  handler: async (args, ctx) =>
-    performUpload(args, ctx, { requireExisting: false }),
+  // Args are ignored on purpose: rejecting before validation means a caller can
+  // never learn anything useful (a "valid" error, a collision) by probing this
+  // tool. Every call gets the same answer.
+  handler: async (_args, _ctx) =>
+    errorResult({
+      error: "tool_deprecated_for_external_use",
+      message:
+        "This tool is not callable from external clients. For user-initiated uploads, use the cdn-file-upload skill from cdn-mcp-plugin (zero-click when the sandbox has egress, clickable script otherwise). For CLI-driven uploads, the @22d/cdn-cli PUTs directly to R2 with its own credentials and then calls cdn_finalize_upload. Base64-over-MCP was the anti-pattern this rejection is preventing.",
+      alternative_paths: [
+        "cdn-file-upload skill (Cowork plugin)",
+        "cdn_signed_upload_url + PUT + cdn_finalize_upload (skill zero-click path)",
+        "local cdn CLI: direct R2 PUT + cdn_finalize_upload",
+      ],
+    }),
 };

@@ -79,19 +79,20 @@ MIME type recorded in D1 and served as the \`Content-Type\` header. Inferred aut
 
 ## Upload a blog image
 
+Use the **cdn-file-upload skill** (from cdn-mcp-plugin). It probes the sandbox's network egress and either uploads directly or hands the user a clickable script — see *Uploading from inside a Cowork session* below. Bytes never travel through the MCP as base64; \`cdn_upload_file\` hard-rejects external callers as of Phase 11.3.
+
+Under the hood, the byte-moving sequence is always the same:
+
 \`\`\`javascript
-cdn_upload_file({
-  project: "blog",
-  name: "post-2026-05-04-hero.png",
-  content_base64: "<base64-encoded-bytes>",
-  content_type: "image/png"   // optional — inferred from .png
-})
+cdn_signed_upload_url({ project: "blog", name: "post-2026-05-04-hero.png", content_type: "image/png" })
+// → PUT the bytes to upload_url with EVERY header from required_headers
+cdn_finalize_upload({ project: "blog", name: "post-2026-05-04-hero.png", content_type: "image/png", size_bytes: 412334 })
 \`\`\`
 
 - Auto-creates the \`blog\` project if it doesn't exist.
-- Errors with \`file_exists\` if the file already exists at \`(blog, post-2026-05-04-hero.png)\`. Pass \`replace: true\` to overwrite, OR use \`cdn_replace_file\` (cleaner intent).
-- Returns \`{ url, project, name, size_bytes, content_type, uploaded_at, version: 1, ... }\`.
-- Public URL: \`https://cdn.22d.app/blog/post-2026-05-04-hero.png\`.
+- \`cdn_signed_upload_url\` errors with \`file_exists\` if the file already exists at \`(blog, post-2026-05-04-hero.png)\`. Pass \`replace: true\` to overwrite, OR use \`cdn_replace_file\` (cleaner intent).
+- \`cdn_finalize_upload\` returns \`{ url, project, name, size_bytes, content_type, uploaded_at, version: 1, ... }\`.
+- Public URL: \`https://cdn.22d.app/blog/post-2026-05-04-hero.png\` — deterministic, known before the upload starts.
 
 ## Replace an image without breaking embedded links
 
@@ -103,7 +104,7 @@ cdn_replace_file({
 })
 \`\`\`
 
-- Errors with \`file_not_found\` if the file doesn't exist (use \`cdn_upload_file\` to create).
+- Errors with \`file_not_found\` if the file doesn't exist — create it first via the upload path above (\`cdn_signed_upload_url\` → PUT → \`cdn_finalize_upload\`), then replace.
 - Same R2 key, same public URL. Bumps \`version\` to 2 (then 3, 4, ...). Sets \`last_replaced_at\` to now.
 - New bytes serve at the public URL within ~60s (edge cache TTL). For instant verification, fetch with \`?v=2\` or \`?bust=<timestamp>\`.
 
@@ -175,83 +176,73 @@ Optional — projects auto-create on first upload. Use this if you want the proj
 
 # Uploading from inside a Cowork session (sandbox limitations)
 
-Cowork sessions run in a network-restricted sandbox. Specifically: **the sandbox CANNOT reach \`*.r2.cloudflarestorage.com\`** — the S3-compatible endpoint that presigned URLs target. This means:
-
-- ✅ Calling \`cdn_upload_file\` (base64 through the Worker) works from any session, including from inside Cowork.
-- ❌ Calling \`cdn_signed_upload_url\` then trying to \`curl PUT\` to the returned URL **fails from inside Cowork** with status \`000\` (network unreachable).
-- ✅ The PUT to a presigned URL works fine from your real terminal, a real browser, or any non-sandbox network.
-
-Use the right pattern for the file size and your environment:
-
-## Pattern A — Small files (<5 MB): base64 directly
-
-Easy path for blog images, icons, small assets:
-
-\`\`\`javascript
-cdn_upload_file({
-  project: "blog",
-  name: "hero.png",
-  content_base64: "<base64>",
-  content_type: "image/png"   // optional, inferred from .png
-})
-\`\`\`
-
-The base64 lives in the call site and the response. For files up to a few MB, fine.
-
-## Pattern B — Medium files (5–50 MB) from inside Cowork: subagent fan-out
-
-For batch uploads, or single files where base64 would balloon the parent session's context, spawn a subagent per file. Each subagent's context holds the base64; the parent only sees URLs:
-
-\`\`\`javascript
-For each file:
-  Spawn an Agent with prompt like:
-    "Read /path/to/file.png, base64-encode the bytes,
-     then call cdn_upload_file with project=<proj>,
-     name=<basename>, content_base64=<encoded>,
-     content_type=<inferred>. Return just the public URL
-     — do NOT echo the base64 back."
-\`\`\`
-
-Lets you upload 10–20 medium files without the parent session's context exploding. The parent receives N URLs, the subagents discard their bases64 transcripts.
-
-## Pattern C — Large files (>50 MB): local terminal PUT
-
-For videos and other large assets, run the upload from your real terminal (outside Cowork):
+Cowork sessions run in a network-restricted sandbox whose egress allowlist is **per-session** — it only applies to sessions started AFTER the user changed the setting. So reachability varies session to session and **must be probed, never assumed**:
 
 \`\`\`bash
-# 1. From inside Cowork: get a presigned URL via the MCP
+curl -sI --max-time 10 https://cdn.22d.app/
+\`\`\`
+
+A real origin response (\`server: cloudflare\`) means egress works. A timeout, or \`X-Proxy-Error: blocked-by-allowlist\`, means it doesn't.
+
+Two hosts matter, and they are allowlisted separately:
+
+- \`cdn.22d.app\` — the public CDN (the probe + verify target)
+- \`<account>.r2.cloudflarestorage.com\` — the S3 endpoint presigned PUTs actually target
+
+Having the first without the second is a real, observed configuration: the probe passes but the byte transfer is refused. **File size does not select the pattern — reachability does.** There is no base64 path: \`cdn_upload_file\` hard-rejects external callers as of Phase 11.3.
+
+## Pattern A — the cdn-file-upload skill (the default; just use this)
+
+Install cdn-mcp-plugin and let the skill do it. It probes egress, sanitizes the filename, picks Pattern B or C for you, verifies the public URL, and hands back the link. Everything below is what the skill is doing internally — you rarely need to run it by hand.
+
+## Pattern B — zero-click: signed URL + PUT + finalize (sandbox HAS egress)
+
+\`\`\`bash
+# 1. Mint a presigned PUT (15 min default)
 #    cdn_signed_upload_url({ project, name, content_type })
-#    → copy upload_url + required_headers
+#    → upload_url + required_headers
 
-# 2. From your local terminal: PUT bytes directly to R2
-curl -X PUT \\
-  -H "Content-Type: video/mp4" \\
+# 2. PUT the bytes straight from the sandbox
+curl -sS --max-time 60 -X PUT -T ./hero.png \\
+  -H "Content-Type: image/png" \\
   -H "Cache-Control: public, max-age=60" \\
-  --data-binary @./big-video.mp4 \\
   "$UPLOAD_URL"
-# (must include EVERY header from required_headers, exactly as returned)
+# Send EVERY header from required_headers, byte-identical. Both Content-Type
+# and Cache-Control are signed — omit either and R2 returns 403
+# SignatureDoesNotMatch, even with open egress.
 
-# 3. Back in Cowork: finalize the metadata
+# 3. Commit the metadata
 #    cdn_finalize_upload({ project, name, content_type, size_bytes })
 \`\`\`
 
+Works for any size (curl streams from disk; no payload cap). Requires BOTH hosts allowlisted, and the source file must be readable from the sandbox. If the PUT is refused, fall back to Pattern C — an abandoned presign is harmless, since no D1 row exists until finalize.
+
+## Pattern C — local terminal / CLI (sandbox has NO egress)
+
+Run the upload on the user's host, where the network is unrestricted. The \`cdn\` CLI wraps the same three steps (it PUTs to R2 with its own credentials, then calls \`cdn_finalize_upload\`):
+
+\`\`\`bash
+cdn upload blog ./hero.png --name hero.png
+\`\`\`
+
+The skill's fallback is a double-clickable \`.command\`/\`.sh\`/\`.bat\` wrapper around exactly this. The same manual \`curl -X PUT\` from Pattern B also works from a real terminal, a browser, or any non-sandbox network.
+
 ## Quick-decision matrix
 
-| File size | From inside Cowork | From local terminal |
-| --- | --- | --- |
-| < 5 MB | Pattern A | Pattern A or C |
-| 5–50 MB | Pattern B | Pattern A or C |
-| > 50 MB | Pattern B (slow) or pivot to C | Pattern C |
-
-Numbers are context-window guidelines, not hard limits. Adjust based on session state.
+| Situation | Pattern |
+| --- | --- |
+| Anything, from a Cowork session | **A** (the skill decides B vs C for you) |
+| Probe passes + source readable in sandbox | **B** — zero-click, any size |
+| Probe fails, R2 host blocked, or file not in the sandbox | **C** — clickable script / local CLI |
+| Any size at all | Never base64 — \`cdn_upload_file\` rejects |
 
 # Quick reference — "I want to X" → call Y
 
 | What I want to do | Tool to call |
 | --- | --- |
-| Upload bytes | \`cdn_upload_file\` |
+| Upload bytes (any size) | the \`cdn-file-upload\` skill — or, by hand, \`cdn_signed_upload_url\` → (PUT bytes) → \`cdn_finalize_upload\` |
 | Update existing without breaking links | \`cdn_replace_file\` |
-| Upload a video > 100MB | \`cdn_signed_upload_url\` → (PUT bytes) → \`cdn_finalize_upload\` |
+| Upload a video > 100MB | same as above — size doesn't change the path |
 | List everything globally | \`cdn_list_files\` (no args) |
 | List files in one folder | \`cdn_list_files({project})\` |
 | List all folders | \`cdn_list_projects\` |
@@ -263,7 +254,7 @@ Numbers are context-window guidelines, not hard limits. Adjust based on session 
 
 # What's not available yet
 
-- **\`cdn_rename_file\`** — currently a stub. Workaround: \`cdn_upload_file\` with the new name, then \`cdn_delete_file\` on the old. Note this changes the public URL.
+- **\`cdn_rename_file\`** — currently a stub. Workaround: re-upload under the new name (skill, or \`cdn_signed_upload_url\` → PUT → \`cdn_finalize_upload\`), then \`cdn_delete_file\` on the old. Note this changes the public URL.
 - **\`cdn_set_cache_headers\`** — currently a stub. The default \`Cache-Control: public, max-age=60\` is global and tuned for fast replace visibility. To change globally, edit \`DEFAULT_CACHE_CONTROL\` in \`src/mcp/util.ts\` and redeploy.
 - **Admin UI / D1 explorer** — parked. Use the \`cdn_list_*\` and \`cdn_get_*\` tools, or the Cloudflare R2 dashboard for raw browsing.
 

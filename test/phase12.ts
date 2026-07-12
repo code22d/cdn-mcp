@@ -18,7 +18,7 @@ import {
   parsePrincipals,
   resolvePathToken,
 } from "../src/principals";
-import { MockStore, makeEnv } from "./_mock";
+import { MockStore, makeEnv, seedR2 } from "./_mock";
 import type { Env } from "../src/types";
 
 let passed = 0;
@@ -64,9 +64,49 @@ async function rpc(
   return { status: 200, payload: JSON.parse(text) };
 }
 
-const PNG_B64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]).toString(
-  "base64"
-);
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+/**
+ * Seed a file through the dispatcher the way real clients do: presign → PUT →
+ * finalize. Phase 11.3 hard-rejected cdn_upload_file, so base64-over-MCP is no
+ * longer available for seeding at this level — and it was never how the CLI or
+ * the skill's zero-click path actually wrote bytes anyway. `claimed` is the
+ * project the caller ASKS for; `landsIn` is where the principal should force it.
+ *
+ * The mock collapses the client's real PUT into a seedR2 at the presigned key,
+ * which is the same shortcut Phase 4's finalize tests take.
+ */
+async function uploadViaPresign(
+  env: Env,
+  store: MockStore,
+  token: string,
+  claimed: string,
+  landsIn: string,
+  name: string
+): Promise<{ status: number; payload: unknown }> {
+  const presign = await rpc(env, token, "cdn_signed_upload_url", {
+    project: claimed,
+    name,
+    content_type: "image/png",
+  });
+  const presignPayload = presign.payload as { project?: string; error?: string };
+  assert.equal(
+    presignPayload.project,
+    landsIn,
+    `presign should be scoped to ${landsIn}, got ${presignPayload.project ?? presignPayload.error}`
+  );
+
+  // The client PUTs to the presigned URL. The signature only ever covers the
+  // forced key, so the bytes can only land under the principal's project.
+  seedR2(store, `${landsIn}/${name}`, PNG_BYTES, "image/png");
+
+  return rpc(env, token, "cdn_finalize_upload", {
+    project: claimed,
+    name,
+    content_type: "image/png",
+    size_bytes: PNG_BYTES.length,
+  });
+}
 
 async function main(): Promise<void> {
   console.log("phase12: per-project principals");
@@ -138,21 +178,30 @@ async function main(): Promise<void> {
     const store = new MockStore();
     const env = envWithPrincipals(store);
 
-    // Owner seeds a file in tenant-b's project.
-    const seeded = await rpc(env, "test-token", "cdn_upload_file", {
-      project: "tenant-b",
-      name: "secret.png",
-      content_base64: PNG_B64,
-    });
+    // Owner seeds a file in tenant-b's project (owner is unscoped: claims
+    // tenant-b, lands in tenant-b).
+    const seeded = await uploadViaPresign(
+      env,
+      store,
+      "test-token",
+      "tenant-b",
+      "tenant-b",
+      "secret.png"
+    );
     assert.equal((seeded.payload as { project: string }).project, "tenant-b");
+    assert.ok(store.r2.has("tenant-b/secret.png"));
     ok("e2e: owner token uploads to any project");
 
-    // Tenant-a uploads while CLAIMING tenant-b → forced into tenant-a.
-    const up = await rpc(env, TENANT_TOKEN, "cdn_upload_file", {
-      project: "tenant-b",
-      name: "mine.png",
-      content_base64: PNG_B64,
-    });
+    // Tenant-a uploads while CLAIMING tenant-b → forced into tenant-a at BOTH
+    // the presign and the finalize.
+    const up = await uploadViaPresign(
+      env,
+      store,
+      TENANT_TOKEN,
+      "tenant-b",
+      "tenant-a",
+      "mine.png"
+    );
     const upPayload = up.payload as { project: string; url: string };
     assert.equal(upPayload.project, "tenant-a");
     assert.ok(upPayload.url.endsWith("/tenant-a/mine.png"));

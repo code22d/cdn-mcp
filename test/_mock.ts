@@ -18,6 +18,7 @@
 
 import type { Env, ToolContext, ToolResult } from "../src/types";
 import type { Principal } from "../src/principals";
+import { performUpload } from "../src/mcp/upload";
 
 // -----------------------------------------------------------------------------
 // Row shapes — match the D1 migration in migrations/0001_init.sql.
@@ -547,6 +548,26 @@ export function makeCtx(store: MockStore, principal?: Principal): ToolContext {
     // owner; phase 12 passes a scoped principal explicitly.
     principal: principal ?? { project: "*" },
   };
+}
+
+/**
+ * Seed a file — or exercise upload semantics — through the canonical write path.
+ *
+ * Phase 11.3 hard-rejected cdn_upload_file's TOOL SURFACE, but not the write
+ * path behind it: performUpload is still the canonical R2-PUT-then-D1-mutate
+ * path, and still backs cdn_replace_file. Every test that used
+ * `cdn_upload_file.handler(...)` — whether to seed a row for some other tool's
+ * test, or to assert insert / replace / rollback / validator semantics — calls
+ * this instead. Same behavior, same response envelope; only the tool surface
+ * went away, so none of that coverage should.
+ *
+ * The rejection itself is asserted in test/phase11_3.ts.
+ */
+export function seedUpload(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolResult> {
+  return performUpload(args, ctx, { requireExisting: false });
 }
 
 export function parseResult(res: ToolResult): unknown {

@@ -39,11 +39,11 @@ import { cdn_signed_upload_url } from "../src/mcp/tools/cdn_signed_upload_url";
 import { cdn_finalize_upload } from "../src/mcp/tools/cdn_finalize_upload";
 import { cdn_get_file } from "../src/mcp/tools/cdn_get_file";
 import { cdn_list_files } from "../src/mcp/tools/cdn_list_files";
-import { cdn_upload_file } from "../src/mcp/tools/cdn_upload_file";
 
 import {
   MockStore,
   makeCtx,
+  seedUpload,
   parseResult,
   seedR2,
   SAMPLE_PNG_B64,
@@ -245,8 +245,8 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      // Seed a real row via cdn_upload_file.
-      await cdn_upload_file.handler(
+      // Seed a real row via the canonical write path.
+      await seedUpload(
         {
           project: "phase4-test",
           name: "occupied.png",
@@ -271,7 +271,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "phase4-test",
           name: "occupied.png",
@@ -741,13 +741,13 @@ async function main() {
   );
 
   await check(
-    "cdn_finalize_upload: matches cdn_upload_file's response envelope shape (deepEqual on the keys)",
+    "cdn_finalize_upload: matches performUpload's response envelope shape (deepEqual on the keys)",
     async () => {
       // Phase 4 contract: finalize and upload are indistinguishable to the
       // connector once the bytes are in R2. Same keys, same value types.
       const storeA = new MockStore();
       const ctxA = makeCtx(storeA);
-      const upload = await cdn_upload_file.handler(
+      const upload = await seedUpload(
         {
           project: "p",
           name: "u.png",
@@ -780,11 +780,11 @@ async function main() {
   // ===================================================================
 
   await check(
-    "Phase 4.1: cdn_upload_file sets Cache-Control on R2 (Worker-side PUT path)",
+    "Phase 4.1: performUpload sets Cache-Control on R2 (Worker-side PUT path)",
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "x.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );

@@ -18,7 +18,6 @@
 import assert from "node:assert/strict";
 
 import { cdn_create_project } from "../src/mcp/tools/cdn_create_project";
-import { cdn_upload_file } from "../src/mcp/tools/cdn_upload_file";
 import { cdn_list_files } from "../src/mcp/tools/cdn_list_files";
 import { cdn_list_projects } from "../src/mcp/tools/cdn_list_projects";
 import { cdn_replace_file } from "../src/mcp/tools/cdn_replace_file";
@@ -27,6 +26,7 @@ import { cdn_delete_file } from "../src/mcp/tools/cdn_delete_file";
 import {
   MockStore,
   makeCtx,
+  seedUpload,
   parseResult,
   SAMPLE_PNG_B64,
   SAMPLE_PNG_LEN,
@@ -100,7 +100,7 @@ async function main() {
       const store = new MockStore();
       const ctx = makeCtx(store);
       // Seed via upload (version 1).
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -143,7 +143,7 @@ async function main() {
       const store = new MockStore();
       const ctx = makeCtx(store);
       // Seed with an explicit content_type that differs from the extension.
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "p",
           name: "hero.png",
@@ -175,7 +175,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -202,7 +202,7 @@ async function main() {
       const ctx = makeCtx(store);
       // Seed a real row so we know it's the validators (not file_not_found)
       // doing the rejection.
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -240,7 +240,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -264,7 +264,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -297,7 +297,7 @@ async function main() {
       const ctx = makeCtx(store);
       // Pre-populate a file at a different (project, name) so we can verify
       // the not-found path doesn't sweep up the wrong object.
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "other", name: "f.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -326,7 +326,7 @@ async function main() {
         { name: "phase1-test", description: "kept across delete" },
         ctx
       );
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "phase1-test",
           name: "sample.png",
@@ -395,7 +395,7 @@ async function main() {
       // leaving zero rows and zero objects.
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "x.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -435,7 +435,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "x.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -488,7 +488,7 @@ async function main() {
       const ctx = makeCtx(store);
 
       // Upload — version 1.
-      const upload = await cdn_upload_file.handler(
+      const upload = await seedUpload(
         {
           project: "phase2-test",
           name: "sample.png",

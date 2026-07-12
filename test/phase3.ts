@@ -22,7 +22,6 @@
 import assert from "node:assert/strict";
 
 import { cdn_create_project } from "../src/mcp/tools/cdn_create_project";
-import { cdn_upload_file } from "../src/mcp/tools/cdn_upload_file";
 import { cdn_replace_file } from "../src/mcp/tools/cdn_replace_file";
 import { cdn_list_files } from "../src/mcp/tools/cdn_list_files";
 import { cdn_get_file } from "../src/mcp/tools/cdn_get_file";
@@ -31,6 +30,7 @@ import { cdn_get_stats } from "../src/mcp/tools/cdn_get_stats";
 import {
   MockStore,
   makeCtx,
+  seedUpload,
   parseResult,
   SAMPLE_PNG_B64,
   SAMPLE_PNG_LEN,
@@ -78,7 +78,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "hero.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -114,7 +114,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "real.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -156,7 +156,7 @@ async function main() {
       const ctx = makeCtx(store);
       // Seed a real row so we can confirm that validators (not file_not_found)
       // are doing the rejection.
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "x.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -196,7 +196,7 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "h.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
@@ -260,7 +260,7 @@ async function main() {
       const ctx = makeCtx(store);
       // Two projects, three files total. Use names whose lexical order
       // doesn't match insertion order so the sort is exercised.
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "phase3-stats-b",
           name: "b1.png",
@@ -268,7 +268,7 @@ async function main() {
         },
         ctx
       );
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "phase3-stats-a",
           name: "a1.png",
@@ -276,7 +276,7 @@ async function main() {
         },
         ctx
       );
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "phase3-stats-a",
           name: "a2.png",
@@ -333,7 +333,7 @@ async function main() {
       );
       await cdn_create_project.handler({ name: "empty-two" }, ctx);
       // Then one project with one file.
-      await cdn_upload_file.handler(
+      await seedUpload(
         {
           project: "with-files",
           name: "f.png",
@@ -373,11 +373,11 @@ async function main() {
     async () => {
       const store = new MockStore();
       const ctx = makeCtx(store);
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "a.png", content_base64: SAMPLE_PNG_B64 },
         ctx
       );
-      await cdn_upload_file.handler(
+      await seedUpload(
         { project: "p", name: "b.png", content_base64: SAMPLE_PNG_2_B64 },
         ctx
       );

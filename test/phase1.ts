@@ -27,13 +27,13 @@ import {
 } from "../src/mcp/util";
 
 import { cdn_create_project } from "../src/mcp/tools/cdn_create_project";
-import { cdn_upload_file } from "../src/mcp/tools/cdn_upload_file";
 import { cdn_list_files } from "../src/mcp/tools/cdn_list_files";
 import { cdn_list_projects } from "../src/mcp/tools/cdn_list_projects";
 
 import {
   MockStore,
   makeCtx,
+  seedUpload,
   parseResult,
   SAMPLE_PNG_B64,
   SAMPLE_PNG_LEN,
@@ -202,11 +202,11 @@ async function main() {
     assert.equal(store.projects.length, 0);
   });
 
-  // ---- cdn_upload_file ----
-  await check("cdn_upload_file: new upload inserts file + auto-creates project", async () => {
+  // ---- performUpload (the write path cdn_upload_file used to expose) ----
+  await check("performUpload (ex-cdn_upload_file): new upload inserts file + auto-creates project", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "phase1-test",
         name: "sample.png",
@@ -242,10 +242,10 @@ async function main() {
     assert.equal(r2Obj.contentType, "image/png");
   });
 
-  await check("cdn_upload_file: duplicate without replace → file_exists, no R2 write", async () => {
+  await check("performUpload (ex-cdn_upload_file): duplicate without replace → file_exists, no R2 write", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
-    await cdn_upload_file.handler(
+    await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -253,7 +253,7 @@ async function main() {
       },
       ctx
     );
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -269,10 +269,10 @@ async function main() {
     assert.equal(store.files[0]!.version, 1);
   });
 
-  await check("cdn_upload_file: replace=true bumps version + sets last_replaced_at", async () => {
+  await check("performUpload (ex-cdn_upload_file): replace=true bumps version + sets last_replaced_at", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
-    await cdn_upload_file.handler(
+    await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -281,7 +281,7 @@ async function main() {
       ctx
     );
     // Different bytes (the trailing ZQ== makes this 1 byte: 0x65)
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -309,10 +309,10 @@ async function main() {
     assert.equal(store.r2.get("p/f.png")?.bytes.length, 1);
   });
 
-  await check("cdn_upload_file: invalid base64 → invalid_base64, no D1/R2 write", async () => {
+  await check("performUpload (ex-cdn_upload_file): invalid base64 → invalid_base64, no D1/R2 write", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -328,11 +328,11 @@ async function main() {
     assert.equal(store.r2.size, 0);
   });
 
-  await check("cdn_upload_file: invalid project + filename validators fire before any I/O", async () => {
+  await check("performUpload (ex-cdn_upload_file): invalid project + filename validators fire before any I/O", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
 
-    const bad1 = await cdn_upload_file.handler(
+    const bad1 = await seedUpload(
       {
         project: "with space",
         name: "f.png",
@@ -343,7 +343,7 @@ async function main() {
     assert.equal(bad1.isError, true);
     assert.equal((parseResult(bad1) as { error: string }).error, "invalid_project");
 
-    const bad2 = await cdn_upload_file.handler(
+    const bad2 = await seedUpload(
       {
         project: "p",
         name: "../escape.png",
@@ -358,10 +358,10 @@ async function main() {
     assert.equal(store.files.length, 0);
   });
 
-  await check("cdn_upload_file: explicit content_type overrides extension inference", async () => {
+  await check("performUpload (ex-cdn_upload_file): explicit content_type overrides extension inference", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "weird.png",
@@ -376,11 +376,11 @@ async function main() {
     assert.equal(store.r2.get("p/weird.png")?.contentType, "application/x-custom");
   });
 
-  await check("cdn_upload_file: D1 INSERT failure rolls back R2 (best-effort)", async () => {
+  await check("performUpload (ex-cdn_upload_file): D1 INSERT failure rolls back R2 (best-effort)", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
     store.failNext = { kind: "insert_files", reason: "boom" };
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -397,11 +397,11 @@ async function main() {
     assert.equal(store.files.length, 0);
   });
 
-  await check("cdn_upload_file: D1 UPDATE failure leaves bytes + returns metadata_update_failed", async () => {
+  await check("performUpload (ex-cdn_upload_file): D1 UPDATE failure leaves bytes + returns metadata_update_failed", async () => {
     const store = new MockStore();
     const ctx = makeCtx(store);
     // First a successful upload
-    await cdn_upload_file.handler(
+    await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -412,7 +412,7 @@ async function main() {
     const initialVersion = store.files[0]!.version;
     // Now break the UPDATE for the replace
     store.failNext = { kind: "update_files", reason: "kaboom" };
-    const res = await cdn_upload_file.handler(
+    const res = await seedUpload(
       {
         project: "p",
         name: "f.png",
@@ -560,11 +560,11 @@ async function main() {
     const ctx = makeCtx(store);
     // Two projects, only one has files
     await cdn_create_project.handler({ name: "empty-proj" }, ctx);
-    await cdn_upload_file.handler(
+    await seedUpload(
       { project: "active-proj", name: "a.png", content_base64: SAMPLE_PNG_B64 },
       ctx
     );
-    await cdn_upload_file.handler(
+    await seedUpload(
       { project: "active-proj", name: "b.png", content_base64: SAMPLE_PNG_B64 },
       ctx
     );

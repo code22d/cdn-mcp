@@ -35,7 +35,7 @@ import { OWNER_PRINCIPAL } from "../src/principals";
 import type { Env } from "../src/types";
 
 const MARKER = "Skill-internal use only";
-const EXPECTED_VERSION = "0.1.0-phase11.2";
+const EXPECTED_VERSION = "0.1.0-phase11.3";
 
 // The three tools Phase 11.2 redirects. Everything else in the registry must
 // keep its own description untouched.
