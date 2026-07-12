@@ -11,6 +11,10 @@ post-upload verification.
 This plugin doesn't bundle the CDN itself — the Worker and the CLI have their
 own install paths, referenced below.
 
+## What changed in v0.5.1
+
+v0.5.1 (2026-07-12): manifest-only patch — plugin.json description trimmed under 500 characters. Cowork enforces a 500-char description limit at install time; v0.5.0's description (531 chars) failed install validation. Skill content unchanged from v0.5.0.
+
 ## What changed in v0.5.0
 
 v0.5.0 (2026-07-12): **Adaptive upload.** If the session's sandbox has egress to

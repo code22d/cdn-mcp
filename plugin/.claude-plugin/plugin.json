@@ -1,11 +1,17 @@
 {
   "name": "cdn-mcp-plugin",
-  "version": "0.5.0",
-  "description": "Operational know-how for uploading files to a personal CDN on Cloudflare R2 + Workers + D1. Installs the cdn-file-upload skill, which probes the sandbox's network egress each session and adapts: with egress it uploads zero-click via a signed R2 URL, direct PUT, and finalize; without it, it generates a clickable upload script that runs the local cdn CLI. Any file size or batch, never base64, with filename sanitization and post-upload verification either way. Requires a deployed cdn-mcp Worker — see the plugin README for setup.",
+  "version": "0.5.1",
+  "description": "Operational know-how for uploading files to a personal CDN on Cloudflare R2 + Workers + D1. Installs the cdn-file-upload skill, which probes sandbox egress each session and adapts: with egress it uploads zero-click via signed R2 URL + direct PUT + finalize; without it, it generates a clickable script running the local cdn CLI. Any size or batch, never base64, filename sanitization and post-upload verification either way. Requires a deployed cdn-mcp Worker — see the plugin README.",
   "author": {
     "name": "Rene Banuelos"
   },
   "homepage": "https://github.com/code22d/cdn-mcp",
   "repository": "https://github.com/code22d/cdn-mcp",
-  "keywords": ["cdn", "cloudflare", "r2", "uploads", "mcp"]
+  "keywords": [
+    "cdn",
+    "cloudflare",
+    "r2",
+    "uploads",
+    "mcp"
+  ]
 }
