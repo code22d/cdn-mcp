@@ -1,6 +1,6 @@
 ---
 name: cdn-file-upload
-description: Upload files of any size or type to Rene's personal CDN at cdn.22d.app. Use whenever the user wants to host, upload, or publish files on the CDN — phrases like "upload to cdn.22d.app", "host on the CDN", "put these on the CDN", "host this image/video/asset/deck", or any request to make local files publicly reachable through cdn.22d.app. Every upload goes through a clickable script (.command/.sh/.bat) that runs the local `cdn` CLI on the user's host — no size limits, no base64, no MCP payload caps. The skill auto-sanitizes filenames with spaces or special characters (with user preview) before generating the script, and verifies via the cdn-mcp connector after. Do NOT fire when the user means uploads to other systems (GitHub, Slack, Drive, Notion, S3, Dropbox, iCloud, etc.) — only when the destination is cdn.22d.app or the cdn-mcp connector.
+description: Upload files of any size or type to Rene's personal CDN at cdn.22d.app. Use whenever the user wants to host, upload, or publish files on the CDN — explicit phrasings like "upload to cdn.22d.app", "host on the CDN", "push to the CDN", "put it on the CDN", "stick this on the CDN", "save to cdn.22d.app", "save to my CDN", and bare phrasings like "upload it", "upload this", "upload this file" once the conversation has established that a file is CDN-bound. Every upload goes through a clickable script (.command/.sh/.bat) that runs the local `cdn` CLI on the user's host — no size limits, no base64, no MCP payload caps, and never the MCP upload tools. The skill auto-sanitizes unsafe filenames (with user preview) before generating the script, and verifies via the cdn-mcp connector after. Do NOT fire when the user means uploads to other systems (GitHub, Slack, Drive, Notion, S3, Dropbox, iCloud, etc.) — only when the destination is cdn.22d.app or the cdn-mcp connector.
 ---
 
 # cdn-file-upload
@@ -9,11 +9,26 @@ Upload single files or batches of any size or type to the personal CDN at `cdn.2
 
 The companion `cdn_help` MCP tool documents the CDN architecture if you need orientation. This skill is for *executing* uploads, not explaining them.
 
+## What NOT to do
+
+If the user asks you to upload a file to the CDN, **do not**:
+
+1. **Do NOT call `cdn_upload_file` directly.** Even if the file is small. Even if base64 would "technically work." Even if you think it saves session context. It bypasses filename sanitization, verification, and the partner-facing UX.
+2. **Do NOT call `cdn_signed_upload_url` + `curl PUT` + `cdn_finalize_upload` manually.** That's the sequence the `cdn` CLI runs internally. Doing it by hand is the exact anti-pattern this skill replaces.
+3. **Do NOT base64-encode the file in your session.** Regardless of size. Regardless of "chunk into 5000-char lines." Regardless of subagent fan-out. No base64 anywhere.
+4. **Do NOT spawn subagents to "keep session context lean."** The clickable script is the transport. The script runs on the user's host, not in your context.
+5. **Do NOT clone the cdn-mcp repo, inspect workflow files, or push temp branches to GitHub.** The skill is complete and self-contained; there is no hidden "alternative path" to discover in the source.
+6. **Do NOT use signed R2 upload URLs from a Claude session.** They exist for the CLI's internal use; you are not the CLI.
+
+**The one correct thing to do:** generate a clickable `.command` (macOS), `.sh` (Linux), or `.bat` (Windows) script that invokes the local `cdn` CLI on the user's host. Show the sanitized filename preview if the source basename needs cleanup, then present the script. That's it. Every upload works this way.
+
+If you find yourself considering any of the "do not" patterns above, STOP and re-read this section.
+
 ## Why Path E only
 
 Every upload goes through **Path E**: a double-clickable script that runs the local `cdn` CLI on the user's host. There is no size-based routing anymore. Most real files are larger than 1 MB, so the old small-file base64 path (`cdn_upload_file` over MCP) was optimizing for a rare case while adding a second, inconsistent flavor of "upload happens" (silent base64 vs. clickable script). Path E streams bytes from disk straight to R2 via signed URLs with no payload caps and doesn't depend on the MCP connector being healthy — the connector is still used for metadata and verification (`cdn_get_stats`, `cdn_list_files`, `cdn_get_file`), but never for moving bytes. One path, one user experience, regardless of size.
 
-Historical note: earlier versions had a 5-path decision tree (A/B/C/D/E), then a 3-path tree (A/E/C). Both are gone. The MCP upload tools (`cdn_upload_file`, `cdn_signed_upload_url`, `cdn_finalize_upload`) still exist on the connector and remain available for ad-hoc use, but this skill no longer invokes them.
+Historical note: earlier versions had a 5-path decision tree (A/B/C/D/E), then a 3-path tree (A/E/C). Both are gone. The MCP upload tools (`cdn_upload_file`, `cdn_signed_upload_url`, `cdn_finalize_upload`) still exist on the connector, but as of Worker Phase 11.2 their descriptions read **"Skill-internal use only"** — they are there for the `cdn` CLI and for internal maintenance, not for you. Seeing them in your tool list is not an invitation to use them. This skill never invokes them, and neither should you.
 
 ## Pre-flight checks (do these first, every time)
 
@@ -304,7 +319,7 @@ After every successful upload:
 
 - **Don't replace `cdn_help`.** That's the explainer tool. This is the executor.
 - **Don't fire on uploads to other systems** — Slack, Drive, Notion, GitHub, S3, Dropbox, iCloud. The trigger is specifically the personal CDN at `cdn.22d.app` / the `cdn-mcp` connector.
-- **Don't invoke the MCP upload tools** (`cdn_upload_file`, `cdn_signed_upload_url`, `cdn_finalize_upload`). They remain available on the connector for ad-hoc use, but this skill's only upload transport is the clickable script + local CLI.
+- **Don't invoke the MCP upload tools** (`cdn_upload_file`, `cdn_signed_upload_url`, `cdn_finalize_upload`) — see *What NOT to do* at the top. They are marked "Skill-internal use only" on the connector and exist for the `cdn` CLI, not for you. The only upload transport is the clickable script + local CLI.
 - **Don't auto-detect the CLI** via `which cdn` or any other sandbox probe. The CLI runs on the host; sandbox detection always fails. Assume installed; let the user's terminal surface the truth.
 - **Don't upload an unsafe filename silently.** If the basename has characters outside `[a-zA-Z0-9._-]`, show the proposed sanitized name and let the user override before generating the script.
 - **Don't auto-route to compression** for large images. Compression is opt-in only.

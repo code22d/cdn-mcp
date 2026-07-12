@@ -9,6 +9,18 @@ MCP connector is still used for metadata and post-upload verification.
 This plugin doesn't bundle the CDN itself — the Worker and the CLI have their
 own install paths, referenced below.
 
+## What changed in v0.4.1
+
+v0.4.1 (2026-07-12): Sharpened skill triggers and added an explicit "What NOT
+to do" section that names the specific anti-patterns partners were hitting
+(direct `cdn_upload_file`, base64 chunking, signed-URL + manual curl, subagent
+fan-out, repo cloning). The trigger phrases now cover bare, ambient-context
+asks like "upload it" / "upload this" — previously the skill could fail to fire
+when the CDN was established by conversation rather than named in the request,
+and Claude would reach straight for the MCP upload tools. Coordinates with
+Worker Phase 11.2, which retitles the MCP upload tool descriptions
+("Skill-internal use only") to redirect back to this skill.
+
 ## What changed in v0.4.0
 
 v0.4.0 (2026-06-11): The cdn-file-upload skill now uses Path E (clickable

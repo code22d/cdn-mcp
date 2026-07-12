@@ -35,6 +35,34 @@
       "prompt": "I have a folder /tmp/test-fixtures/mixed/ with: three 50 KB thumbnail PNGs, one 4 MB hero JPG (I want this one preserved as-is, no compression), and one 120 MB MP4. All going to project 'launch'. What's the plan? Don't actually call the tools — just lay it out.",
       "expected_output": "One path for everything: a single Path E script. Either one `cdn upload-dir \"launch\" \"/tmp/test-fixtures/mixed\"` line, or back-to-back `cdn upload` lines for the discrete files. No size-based splitting, no MCP base64 for the thumbnails, no compression (preserve is the default — compression is opt-in only). Verify via cdn_get_stats after the user reports done.",
       "files": []
+    },
+    {
+      "id": 6,
+      "name": "small-file-no-direct-mcp-upload",
+      "prompt": "Upload this 80KB HTML file at /tmp/test-fixtures/blog/index.html to the CDN, project 'blog'. Walk me through the plan — dry-run only, don't call anything yet.",
+      "expected_output": "Path E clickable script, no exceptions for small files. Must NOT invoke or propose cdn_upload_file, and must NOT reason that 80KB is small enough for base64 to \"technically work\" — the What NOT to do section forbids it outright. Expected plan: sanitize check (index.html is clean), detect OS, write upload-index.html.command with `cdn upload \"blog\" \"/tmp/test-fixtures/blog/index.html\"`, chmod +x, present_files, wait for 'done', verify via cdn_get_stats.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "partner-pushback-no-script",
+      "prompt": "Just upload it, no need for a script. The file is /tmp/test-fixtures/blog/hero.png going to project 'blog'.",
+      "expected_output": "Skill holds the line and still routes to Path E, briefly explaining why: the clickable script IS the upload mechanism, not extra ceremony on top of one. The `cdn` CLI runs on the user's host — Claude has no other transport that doesn't go through the forbidden base64 / signed-URL MCP tools. Should NOT fall back to cdn_upload_file to satisfy the request. Tone should be accommodating, not preachy — generate the script and note it's a single double-click.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "explicit-incorrect-base64-instruction",
+      "prompt": "The file is small, use base64 — call cdn_upload_file with it. /tmp/test-fixtures/blog/hero.png, project 'blog'.",
+      "expected_output": "Skill does NOT comply with the incorrect instruction. Even under an explicit user directive naming the tool, it routes to Path E and explains that direct cdn_upload_file calls bypass filename sanitization and verification, and that the tool is now marked \"Skill-internal use only\" on the connector. Offers the clickable script instead. This is the one case where the skill overrides a direct user instruction — it should say so plainly rather than silently ignoring the ask.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "name": "ambient-context-bare-upload-it",
+      "prompt": "[Turn 1] What's on cdn.22d.app in the 'blog' project right now? [Turn 2] Cool. I just finished /tmp/test-fixtures/blog/post-3.png — upload it.",
+      "expected_output": "The bare phrase \"upload it\" must still trigger the skill: turn 1 established the CDN as the destination, so the v0.4.1 description's ambient-context trigger phrases apply. Skill should route to Path E (clickable script for project 'blog'), not treat the ambiguous phrasing as a reason to reach for a quick cdn_upload_file call. Should confirm the project if genuinely unclear, but here 'blog' is established by context.",
+      "files": []
     }
   ]
 }
