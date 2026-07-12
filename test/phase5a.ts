@@ -198,24 +198,32 @@ async function main() {
   // revert to the Phase 0–4 wording wouldn't accidentally preserve it.
   // ===================================================================
 
-  await check("cdn_upload_file: description mentions subagent fan-out", () => {
+  // The three upload tools were hardened here in Phase 5.0a around their
+  // then-current wording (subagent fan-out, the R2 S3 hostname, the
+  // r2_object_not_found error). Phase 11.2 deliberately DELETED that wording —
+  // it was teaching partners the very anti-pattern the cdn-file-upload skill
+  // exists to replace. These checks now guard the redirect that took its place;
+  // test/phase11_2.ts owns the deeper assertions (destination, banned phrases,
+  // over-the-wire delivery).
+
+  await check("cdn_upload_file: description redirects to the skill", () => {
     assert.ok(
-      cdn_upload_file.description.includes("subagents"),
-      `cdn_upload_file description missing "subagents":\n${cdn_upload_file.description}`
+      cdn_upload_file.description.includes("Skill-internal use only"),
+      `cdn_upload_file description missing the Phase 11.2 redirect marker:\n${cdn_upload_file.description}`
     );
   });
 
-  await check("cdn_signed_upload_url: description names the R2 S3 hostname", () => {
+  await check("cdn_signed_upload_url: description redirects to the skill", () => {
     assert.ok(
-      cdn_signed_upload_url.description.includes("r2.cloudflarestorage.com"),
-      `cdn_signed_upload_url description missing "r2.cloudflarestorage.com":\n${cdn_signed_upload_url.description}`
+      cdn_signed_upload_url.description.includes("Skill-internal use only"),
+      `cdn_signed_upload_url description missing the Phase 11.2 redirect marker:\n${cdn_signed_upload_url.description}`
     );
   });
 
-  await check("cdn_finalize_upload: description names the r2_object_not_found error", () => {
+  await check("cdn_finalize_upload: description redirects to the skill", () => {
     assert.ok(
-      cdn_finalize_upload.description.includes("r2_object_not_found"),
-      `cdn_finalize_upload description missing "r2_object_not_found":\n${cdn_finalize_upload.description}`
+      cdn_finalize_upload.description.includes("Skill-internal use only"),
+      `cdn_finalize_upload description missing the Phase 11.2 redirect marker:\n${cdn_finalize_upload.description}`
     );
   });
 

@@ -57,7 +57,7 @@ interface ExistingFileRow {
 export const cdn_finalize_upload: Tool = {
   name: NAME,
   description:
-    "Step 3 of the signed-URL upload flow (after `cdn_signed_upload_url` + the actual PUT). Verifies the R2 object exists at the expected key and that `size_bytes` matches the actual stored size — rejects with `r2_object_not_found` or `size_mismatch` to catch incomplete uploads. Returns the same response shape as `cdn_upload_file`.",
+    "**Skill-internal use only.** Called by the `cdn` CLI after a successful direct PUT to R2. For user-initiated uploads, use the `cdn-file-upload` skill from the `cdn-mcp-plugin`. Direct invocation from a Claude session usually indicates the anti-pattern of trying to work around the skill. (Legacy: writes D1 metadata after a signed-URL PUT completes.)",
   inputSchema: {
     type: "object",
     properties: {

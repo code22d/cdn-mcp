@@ -17,8 +17,11 @@
 //        the new bytes are already at the public URL, the row just didn't
 //        get its version/timestamp bumped. User should retry.
 //
-// Schema is FROZEN as of Phase 0. Only the handler body was refactored — the
-// inputSchema and description are unchanged.
+// inputSchema is FROZEN as of Phase 0 and remains untouched. Phase 11.2 rewrote
+// the `description` only: partners kept reaching for this tool directly (base64
+// small-file uploads) instead of the cdn-file-upload skill, so the description
+// now redirects to the skill. Behavior is unchanged — this is tool-surface
+// wording, not contract.
 // -----------------------------------------------------------------------------
 
 import type { Tool } from "../../types";
@@ -29,7 +32,7 @@ const NAME = "cdn_upload_file";
 export const cdn_upload_file: Tool = {
   name: NAME,
   description:
-    "Upload bytes into a project, base64-encoded in the request. Auto-creates the project if missing. Errors with `file_exists` unless `replace: true`. Best for files <5MB — base64 inflates calling-session context. For 5–50MB from inside a sandboxed session, fan out via subagents (each subagent holds the base64 in its own context). For >50MB, use `cdn_signed_upload_url` instead. See `cdn_help` for full upload-pattern guidance.",
+    "**Skill-internal use only.** For user-initiated uploads, use the `cdn-file-upload` skill from the `cdn-mcp-plugin` — it auto-generates a clickable `.command`/`.sh`/`.bat` script that runs the local `cdn` CLI on the user's host, with no size limits, no base64 chunking, and no MCP payload caps. Direct invocation of this tool bypasses filename sanitization, verification, and the partner-facing UX; only use it when explicitly implementing the skill or performing internal maintenance. (Legacy: uploads a file into R2 at {project}/{filename} via base64 in JSON.)",
   inputSchema: {
     type: "object",
     properties: {

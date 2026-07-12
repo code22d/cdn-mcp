@@ -45,7 +45,7 @@ interface ExistingFileRow {
 export const cdn_signed_upload_url: Tool = {
   name: NAME,
   description:
-    "Generate a short-lived presigned R2 URL for direct PUT uploads. Use for files >100MB or to avoid base64 round-trip overhead. PUTs to the returned URL fail from inside the Cowork sandbox (egress to `*.r2.cloudflarestorage.com` is blocked — symptom: status 000). Run the PUT from a local terminal, real browser, or any non-sandbox network. ALL headers from `required_headers` must be sent in the PUT exactly as returned. After PUT, call `cdn_finalize_upload`. See `cdn_help` for the full two-step flow.",
+    "**Skill-internal use only.** For user-initiated uploads, use the `cdn-file-upload` skill from the `cdn-mcp-plugin` — it auto-generates a clickable script that uses the local `cdn` CLI which handles signed uploads correctly. Direct use of this tool + a manual `curl PUT` + `cdn_finalize_upload` sequence is the pattern the skill explicitly replaces. (Legacy: returns a presigned R2 PUT URL for large files.)",
   inputSchema: {
     type: "object",
     properties: {
